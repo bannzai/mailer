@@ -1,24 +1,47 @@
 import SwiftUI
 import WebKit
 
-/// HTML メール本文の表示。リンクは外部ブラウザで開き、WebView 内では遷移させない。
-struct HTMLView: UIViewRepresentable {
-    let html: String
+#if os(iOS)
+    /// HTML メール本文の表示。リンクは外部ブラウザで開き、WebView 内では遷移させない。
+    struct HTMLView: UIViewRepresentable {
+        let html: String
 
-    func makeUIView(context: Context) -> WKWebView {
-        let webView = WKWebView()
-        webView.navigationDelegate = context.coordinator
-        return webView
+        func makeUIView(context: Context) -> WKWebView {
+            let webView = WKWebView()
+            webView.navigationDelegate = context.coordinator
+            return webView
+        }
+
+        func updateUIView(_ webView: WKWebView, context: Context) {
+            webView.loadHTMLString(HTMLView.wrapped(html), baseURL: nil)
+        }
+
+        func makeCoordinator() -> HTMLViewCoordinator {
+            HTMLViewCoordinator()
+        }
     }
+#else
+    /// HTML メール本文の表示 (macOS)。リンクは外部ブラウザで開き、WebView 内では遷移させない。
+    struct HTMLView: NSViewRepresentable {
+        let html: String
 
-    func updateUIView(_ webView: WKWebView, context: Context) {
-        webView.loadHTMLString(Self.wrapped(html), baseURL: nil)
+        func makeNSView(context: Context) -> WKWebView {
+            let webView = WKWebView()
+            webView.navigationDelegate = context.coordinator
+            return webView
+        }
+
+        func updateNSView(_ webView: WKWebView, context: Context) {
+            webView.loadHTMLString(HTMLView.wrapped(html), baseURL: nil)
+        }
+
+        func makeCoordinator() -> HTMLViewCoordinator {
+            HTMLViewCoordinator()
+        }
     }
+#endif
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-
+extension HTMLView {
     /// モバイル幅に収めるための viewport 指定を付けて包む。
     static func wrapped(_ html: String) -> String {
         """
@@ -26,19 +49,24 @@ struct HTMLView: UIViewRepresentable {
         <body>\(html)</body></html>
         """
     }
+}
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
-        func webView(
-            _ webView: WKWebView,
-            decidePolicyFor navigationAction: WKNavigationAction,
-            decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void
-        ) {
-            if navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url {
+/// リンククリックを外部ブラウザへ逃がす WKWebView のデリゲート。
+final class HTMLViewCoordinator: NSObject, WKNavigationDelegate {
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void
+    ) {
+        if navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url {
+            #if os(iOS)
                 UIApplication.shared.open(url)
-                decisionHandler(.cancel)
-                return
-            }
-            decisionHandler(.allow)
+            #else
+                NSWorkspace.shared.open(url)
+            #endif
+            decisionHandler(.cancel)
+            return
         }
+        decisionHandler(.allow)
     }
 }

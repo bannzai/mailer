@@ -27,8 +27,14 @@ final class AppModel {
         reloadAccounts()
     }
 
+    /// macOS は CLI と同じ Desktop クライアント (~/.config/mailer/oauth.json) を使い、トークンを CLI と共有する。
+    /// iOS はアプリ内で入力した iOS 用クライアント ID を使う。
     var configuration: OAuthConfiguration? {
-        googleClientID.isEmpty ? nil : OAuthConfiguration(clientID: googleClientID)
+        #if os(macOS)
+            try? OAuthConfiguration.load()
+        #else
+            googleClientID.isEmpty ? nil : OAuthConfiguration(clientID: googleClientID)
+        #endif
     }
 
     var accountManager: AccountManager? {

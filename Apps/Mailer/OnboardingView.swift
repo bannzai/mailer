@@ -21,19 +21,28 @@ struct OnboardingView: View {
             Text("Gmail アカウントを追加して始めましょう。")
                 .foregroundStyle(.secondary)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Google OAuth クライアント ID (iOS 用)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("xxxx.apps.googleusercontent.com", text: $model.googleClientID)
-                    .textFieldStyle(.roundedBorder)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
-                Text("取得手順はリポジトリの documents/setup-oauth.md を参照")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal)
+            #if os(iOS)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Google OAuth クライアント ID (iOS 用)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextField("xxxx.apps.googleusercontent.com", text: $model.googleClientID)
+                        .textFieldStyle(.roundedBorder)
+                        .autocorrectionDisabled()
+                        .disableAutocapitalization()
+                    Text("取得手順はリポジトリの documents/setup-oauth.md を参照")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal)
+            #else
+                if model.configuration == nil {
+                    Text("~/.config/mailer/oauth.json に OAuth クライアント設定を置いてください (documents/setup-oauth.md 参照)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal)
+                }
+            #endif
 
             Button {
                 Task { await addAccount() }
@@ -46,7 +55,7 @@ struct OnboardingView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .disabled(model.googleClientID.isEmpty || isAuthorizing)
+            .disabled(model.configuration == nil || isAuthorizing)
             .padding(.horizontal)
 
             if let errorMessage {

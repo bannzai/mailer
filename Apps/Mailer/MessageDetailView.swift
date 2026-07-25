@@ -28,19 +28,21 @@ struct MessageDetailView: View {
             }
         }
         .navigationTitle(message?.subject ?? "")
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavigationBarTitle()
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     showsQuickLabel = true
                 } label: {
                     Label("ラベル即分け", systemImage: "tag")
                 }
+                .keyboardShortcut("l", modifiers: [])
                 Button {
                     Task { await archive() }
                 } label: {
                     Label("アーカイブ", systemImage: "archivebox")
                 }
+                .keyboardShortcut("e", modifiers: [])
             }
         }
         .sheet(isPresented: $showsQuickLabel) {

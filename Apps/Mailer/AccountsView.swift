@@ -50,13 +50,23 @@ struct AccountsView: View {
                     }
                 }
 
-                if model.googleClientID.isEmpty {
-                    Section("Google OAuth クライアント ID (iOS 用)") {
-                        TextField("xxxx.apps.googleusercontent.com", text: $model.googleClientID)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
+                #if os(iOS)
+                    if model.googleClientID.isEmpty {
+                        Section("Google OAuth クライアント ID (iOS 用)") {
+                            TextField("xxxx.apps.googleusercontent.com", text: $model.googleClientID)
+                                .autocorrectionDisabled()
+                                .disableAutocapitalization()
+                        }
                     }
-                }
+                #else
+                    if model.configuration == nil {
+                        Section {
+                            Text("~/.config/mailer/oauth.json に OAuth クライアント設定を置いてください (documents/setup-oauth.md 参照)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                #endif
 
                 Section {
                     Button {
@@ -68,7 +78,7 @@ struct AccountsView: View {
                             Label("アカウントを追加", systemImage: "person.badge.plus")
                         }
                     }
-                    .disabled(model.googleClientID.isEmpty || isAuthorizing)
+                    .disabled(model.configuration == nil || isAuthorizing)
                 } footer: {
                     if let errorMessage {
                         Text(errorMessage).foregroundStyle(.red)
@@ -76,7 +86,7 @@ struct AccountsView: View {
                 }
             }
             .navigationTitle("アカウント管理")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationBarTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("閉じる") { dismiss() }
@@ -97,6 +107,9 @@ struct AccountsView: View {
                 }
             }
         }
+        #if os(macOS)
+            .frame(minWidth: 440, minHeight: 360)
+        #endif
     }
 
     private func addAccount() async {
