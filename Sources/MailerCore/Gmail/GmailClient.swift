@@ -141,6 +141,21 @@ public struct GmailClient: Sendable {
         )
     }
 
+    /// 名前でラベルを探し、無ければ作成する (冪等)。並行作成の 409 は再取得で解決する。
+    public func findOrCreateLabel(name: String) async throws -> GmailLabel {
+        if let existing = try await listLabels().first(where: { $0.name == name }) {
+            return existing
+        }
+        do {
+            return try await createLabel(name: name)
+        } catch let error as GmailAPIError where error.statusCode == 409 {
+            if let existing = try await listLabels().first(where: { $0.name == name }) {
+                return existing
+            }
+            throw error
+        }
+    }
+
     public func updateLabel(id: String, name: String) async throws -> GmailLabel {
         try await execute(method: "PUT", path: "labels/\(id)", body: ["name": name])
     }
