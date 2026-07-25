@@ -149,6 +149,29 @@ private func gmailRequests(_ transport: MockTransport) -> [URLRequest] {
     #expect(decoded.flatMap(\.ids) == ids)
 }
 
+@Test func findOrCreateLabelReturnsExistingLabelWithoutCreating() async throws {
+    let (client, transport) = makeClient(gmailResponses: [
+        (200, #"{"labels": [{"id": "Label_1", "name": "newsletter"}]}"#)
+    ])
+    let label = try await client.findOrCreateLabel(name: "newsletter")
+
+    #expect(label.id == "Label_1")
+    #expect(gmailRequests(transport).count == 1)
+}
+
+@Test func findOrCreateLabelCreatesWhenMissing() async throws {
+    let (client, transport) = makeClient(gmailResponses: [
+        (200, #"{"labels": [{"id": "Label_1", "name": "other"}]}"#),
+        (200, #"{"id": "Label_2", "name": "newsletter"}"#),
+    ])
+    let label = try await client.findOrCreateLabel(name: "newsletter")
+
+    #expect(label.id == "Label_2")
+    let requests = gmailRequests(transport)
+    #expect(requests.count == 2)
+    #expect(requests[1].httpMethod == "POST")
+}
+
 @Test func apiErrorBodyIsDecoded() async throws {
     let (client, _) = makeClient(gmailResponses: [
         (404, #"{"error": {"code": 404, "message": "Requested entity was not found.", "status": "NOT_FOUND"}}"#)
