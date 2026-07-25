@@ -95,7 +95,7 @@ struct QuickLabelSheet: View {
                 }
             }
             .navigationTitle("ラベル即分け")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationBarTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("閉じる") { dismiss() }
@@ -107,6 +107,9 @@ struct QuickLabelSheet: View {
                 }
             }
         }
+        #if os(macOS)
+            .frame(minWidth: 440, minHeight: 420)
+        #endif
     }
 
     private func run() async {

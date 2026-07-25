@@ -18,15 +18,22 @@ struct InboxView: View {
                 ContentUnavailableView(
                     "受信トレイは空です",
                     systemImage: "tray",
-                    description: Text("引っ張って更新できます")
+                    description: Text(Self.refreshHint)
                 )
             } else {
                 messageList
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle("受信トレイ")
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    Task { await reload() }
+                } label: {
+                    Label("更新", systemImage: "arrow.clockwise")
+                }
+                .keyboardShortcut("r", modifiers: .command)
                 accountMenu
             }
         }
@@ -88,6 +95,14 @@ struct InboxView: View {
             }
         }
     }
+
+    static let refreshHint: String = {
+        #if os(macOS)
+            return "⌘R で更新できます"
+        #else
+            return "引っ張って更新できます"
+        #endif
+    }()
 
     /// どのアカウントを見ているかを常に判別できるよう、一覧の上に識別色バッジ + メールアドレスを固定表示する。
     private var currentAccountBar: some View {

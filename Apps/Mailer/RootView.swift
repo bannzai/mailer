@@ -6,12 +6,17 @@ struct RootView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        if model.accountList.accounts.isEmpty {
-            OnboardingView()
-        } else {
-            NavigationStack {
-                InboxView()
+        Group {
+            if model.accountList.accounts.isEmpty {
+                OnboardingView()
+            } else {
+                NavigationStack {
+                    InboxView()
+                }
             }
         }
+        #if os(macOS)
+            .frame(minWidth: 700, minHeight: 480)
+        #endif
     }
 }
