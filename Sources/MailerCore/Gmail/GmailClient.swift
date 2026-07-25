@@ -234,7 +234,7 @@ public struct GmailClient: Sendable {
         return collected
     }
 
-    private func execute<Response: Decodable>(
+    func execute<Response: Decodable>(
         method: String,
         path: String,
         queryItems: [URLQueryItem] = []
@@ -243,7 +243,7 @@ public struct GmailClient: Sendable {
         return try JSONDecoder().decode(Response.self, from: data)
     }
 
-    private func execute<Response: Decodable>(
+    func execute<Response: Decodable>(
         method: String,
         path: String,
         queryItems: [URLQueryItem] = [],
@@ -258,7 +258,7 @@ public struct GmailClient: Sendable {
         return try JSONDecoder().decode(Response.self, from: data)
     }
 
-    private func executeNoContent(
+    func executeNoContent(
         method: String,
         path: String,
         queryItems: [URLQueryItem] = []
@@ -266,7 +266,7 @@ public struct GmailClient: Sendable {
         _ = try await executeRaw(method: method, path: path, queryItems: queryItems, bodyData: nil)
     }
 
-    private func executeNoContent(
+    func executeNoContent(
         method: String,
         path: String,
         queryItems: [URLQueryItem] = [],
@@ -280,7 +280,7 @@ public struct GmailClient: Sendable {
         )
     }
 
-    private func executeRaw(
+    func executeRaw(
         method: String,
         path: String,
         queryItems: [URLQueryItem],

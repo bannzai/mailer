@@ -12,6 +12,7 @@ struct MailerCommand: AsyncParsableCommand {
             InboxCommand.self,
             ArchiveCommand.self,
             LabelCommand.self,
+            QuickLabelCommand.self,
         ]
     )
 }
