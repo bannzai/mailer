@@ -62,18 +62,6 @@ struct OnboardingView: View {
     private func addAccount() async {
         isAuthorizing = true
         defer { isAuthorizing = false }
-        errorMessage = nil
-        do {
-            let request = try model.beginAuthorization()
-            let callbackURL = try await webAuthenticationSession.authenticate(
-                using: request.url,
-                callbackURLScheme: request.callbackScheme
-            )
-            try await model.completeAuthorization(callbackURL: callbackURL, request: request)
-        } catch is ASWebAuthenticationSessionError {
-            errorMessage = "認可がキャンセルされました。"
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        errorMessage = await performAddAccount(model: model, session: webAuthenticationSession)
     }
 }

@@ -8,6 +8,7 @@ struct InboxView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var quickLabelTarget: GmailMessage?
+    @State private var showsAccountsSheet = false
 
     var body: some View {
         Group {
@@ -39,6 +40,12 @@ struct InboxView: View {
             QuickLabelSheet(message: message) { movedMessageIds in
                 messages.removeAll { movedMessageIds.contains($0.id) }
             }
+        }
+        .sheet(isPresented: $showsAccountsSheet) {
+            AccountsView()
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            currentAccountBar
         }
         .overlay(alignment: .bottom) {
             if let errorMessage {
@@ -82,6 +89,23 @@ struct InboxView: View {
         }
     }
 
+    /// どのアカウントを見ているかを常に判別できるよう、一覧の上に識別色バッジ + メールアドレスを固定表示する。
+    private var currentAccountBar: some View {
+        HStack(spacing: 8) {
+            if let selectedEmail = model.selectedEmail {
+                AccountBadge(email: selectedEmail, size: 20)
+                Text(selectedEmail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 6)
+        .background(.bar)
+    }
+
     private var accountMenu: some View {
         Menu {
             ForEach(model.accountList.accounts) { record in
@@ -95,8 +119,18 @@ struct InboxView: View {
                     }
                 }
             }
+            Divider()
+            Button {
+                showsAccountsSheet = true
+            } label: {
+                Label("アカウント管理...", systemImage: "person.2.badge.gearshape")
+            }
         } label: {
-            Image(systemName: "person.crop.circle")
+            if let selectedEmail = model.selectedEmail {
+                AccountBadge(email: selectedEmail, size: 28)
+            } else {
+                Image(systemName: "person.crop.circle")
+            }
         }
     }
 
