@@ -1,0 +1,11 @@
+import ArgumentParser
+import MailerCore
+
+@main
+struct MailerCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "mailer",
+        abstract: "bannzai が使うためのメーラー CLI",
+        version: Mailer.version
+    )
+}
