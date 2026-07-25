@@ -31,6 +31,15 @@ private func queryItems(of url: URL) -> [String: String] {
     #expect(query["scope"]?.contains("gmail.settings.basic") == true)
 }
 
+@Test func redirectSchemeIsReversedClientID() {
+    #expect(
+        GoogleOAuthClient.redirectScheme(forClientID: "123-abc.apps.googleusercontent.com")
+            == "com.googleusercontent.apps.123-abc"
+    )
+    #expect(GoogleOAuthClient.redirectScheme(forClientID: "invalid-client-id") == nil)
+    #expect(GoogleOAuthClient.redirectScheme(forClientID: ".apps.googleusercontent.com") == nil)
+}
+
 @Test func exchangeCodeSendsFormParametersAndDecodesResponse() async throws {
     let responseJSON = """
         {

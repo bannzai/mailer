@@ -53,13 +53,19 @@ public struct OAuthConfiguration: Codable, Sendable, Equatable {
 
 /// mailer が使う設定ディレクトリの解決。
 public enum MailerPaths {
-    /// 環境変数 MAILER_CONFIG_DIR で上書き可能。既定は ~/.config/mailer。
+    /// 環境変数 MAILER_CONFIG_DIR で上書き可能。
+    /// 既定は macOS では ~/.config/mailer (CLI とアプリで共有)、iOS ではサンドボックス内の Application Support。
     public static var configDirectory: URL {
         if let override = ProcessInfo.processInfo.environment["MAILER_CONFIG_DIR"], !override.isEmpty {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
-        return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config", isDirectory: true)
-            .appendingPathComponent("mailer", isDirectory: true)
+        #if os(macOS)
+            return FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".config", isDirectory: true)
+                .appendingPathComponent("mailer", isDirectory: true)
+        #else
+            return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("mailer", isDirectory: true)
+        #endif
     }
 }

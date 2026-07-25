@@ -15,7 +15,7 @@ public struct PKCE: Sendable {
         self.codeChallenge = Self.challenge(for: codeVerifier)
     }
 
-    static func randomVerifier() -> String {
+    public static func randomVerifier() -> String {
         var bytes = [UInt8](repeating: 0, count: 32)
         for index in bytes.indices {
             bytes[index] = UInt8.random(in: .min ... .max)
