@@ -14,6 +14,16 @@ public struct GoogleOAuthClient: Sendable {
         self.transport = transport
     }
 
+    /// Google の iOS クライアントが使うカスタム URL スキーム (クライアント ID の逆順表記)。
+    /// 例: "123-abc.apps.googleusercontent.com" → "com.googleusercontent.apps.123-abc"
+    public static func redirectScheme(forClientID clientID: String) -> String? {
+        let suffix = ".apps.googleusercontent.com"
+        guard clientID.hasSuffix(suffix), clientID.count > suffix.count else {
+            return nil
+        }
+        return "com.googleusercontent.apps.\(clientID.dropLast(suffix.count))"
+    }
+
     public func authorizationURL(
         redirectURI: String,
         pkce: PKCE,
