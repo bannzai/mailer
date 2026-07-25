@@ -1,0 +1,30 @@
+name: Mailer
+options:
+  bundleIdPrefix: com.bannzai
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  MailerPackage:
+    path: .
+targets:
+  MailerApp:
+    type: application
+    platform: iOS
+    sources:
+      - Apps/Mailer
+    dependencies:
+      - package: MailerPackage
+        product: MailerCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bannzai.mailer
+        PRODUCT_NAME: Mailer
+        SWIFT_VERSION: "6.0"
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 0.1.0
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Mailer
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGNING_REQUIRED: NO
