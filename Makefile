@@ -6,6 +6,9 @@ BINDIR ?= $(HOME)/bin
 APPS_DIR ?= $(HOME)/Applications
 DERIVED ?= .build/DerivedData
 CONFIG ?= Release
+# LicenseList の build tool plugin (PrepareLicenseList) は Xcode GUI での信頼付与が前提のため、
+# CLI ビルドでは検証をスキップする。
+XCODEBUILD_FLAGS ?= -skipPackagePluginValidation
 
 .PHONY: cli macOS iOS xcodeproj
 
@@ -16,7 +19,7 @@ cli:
 	@echo "installed: $(BINDIR)/mailer"
 
 macOS: xcodeproj
-	xcodebuild -project Mailer.xcodeproj -scheme MailerMac -configuration $(CONFIG) -derivedDataPath "$(DERIVED)" build
+	xcodebuild -project Mailer.xcodeproj -scheme MailerMac -configuration $(CONFIG) -derivedDataPath "$(DERIVED)" $(XCODEBUILD_FLAGS) build
 	mkdir -p "$(APPS_DIR)"
 	rm -rf "$(APPS_DIR)/Mailer.app"
 	ditto "$(DERIVED)/Build/Products/$(CONFIG)/Mailer.app" "$(APPS_DIR)/Mailer.app"
@@ -24,7 +27,7 @@ macOS: xcodeproj
 
 # booted 指定は複数台起動時にインストール先を取り違えるため、UDID を一意に確定してから install する
 iOS: xcodeproj
-	xcodebuild -project Mailer.xcodeproj -scheme MailerApp -configuration $(CONFIG) -destination 'generic/platform=iOS Simulator' -derivedDataPath "$(DERIVED)" build
+	xcodebuild -project Mailer.xcodeproj -scheme MailerApp -configuration $(CONFIG) -destination 'generic/platform=iOS Simulator' -derivedDataPath "$(DERIVED)" $(XCODEBUILD_FLAGS) build
 	@set -e; \
 	udid="$(SIM)"; \
 	if [ -z "$$udid" ]; then \

@@ -1,3 +1,4 @@
+import LicenseList
 import MailerCore
 import SwiftUI
 
@@ -82,6 +83,17 @@ struct AccountsView: View {
                 } footer: {
                     if let errorMessage {
                         Text(errorMessage).foregroundStyle(.red)
+                    }
+                }
+
+                Section("このアプリについて") {
+                    NavigationLink {
+                        LicenseListView()
+                            .licenseViewStyle(.withRepositoryAnchorLink)
+                            .navigationTitle("OSS ライセンス")
+                            .inlineNavigationBarTitle()
+                    } label: {
+                        Label("OSS ライセンス", systemImage: "doc.text")
                     }
                 }
             }

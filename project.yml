@@ -7,6 +7,11 @@ options:
 packages:
   MailerPackage:
     path: .
+  # swift-tools-version 6.2 を要求するため、Swift 6.0 の CI (swift build) が触る Package.swift ではなく
+  # アプリターゲット側の依存として持つ。
+  LicenseList:
+    url: https://github.com/cybozu/LicenseList
+    exactVersion: 2.5.0
 targets:
   MailerApp:
     type: application
@@ -16,6 +21,8 @@ targets:
     dependencies:
       - package: MailerPackage
         product: MailerCore
+      - package: LicenseList
+        product: LicenseList
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bannzai.mailer
@@ -37,6 +44,8 @@ targets:
     dependencies:
       - package: MailerPackage
         product: MailerCore
+      - package: LicenseList
+        product: LicenseList
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bannzai.mailer.mac
