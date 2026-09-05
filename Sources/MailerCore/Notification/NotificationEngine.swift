@@ -56,6 +56,8 @@ public enum NotificationEngine {
     /// 枠を 1 つも設定していない状態で通知が届かなくなると、Gmail 公式アプリの通知を切って本アプリに一本化する運用 (issue #10) が成立しないため即時通知にする。
     public static let defaultPolicy: NotificationPolicy = .immediate
 
+    /// 状態は枠の名前をキーに持つため、同名の枠が複数あるとそれらは同じ状態を共有する。
+    ///
     /// - Parameters:
     ///   - messages: 新着メール (受信順)。
     ///   - rules: 枠定義 (先頭から評価し最初に合致した枠に属する)。
@@ -67,11 +69,12 @@ public enum NotificationEngine {
         states: [String: NotificationRuleState],
         now: Date
     ) -> NotificationDecision {
-        var arrivedIdsByRuleName: [String: [String]] = [:]
+        // 同名の枠があっても先に定義した枠が勝つよう、名前ではなく rules 内の位置で振り分ける。
+        var arrivedIdsByRuleIndex: [Int: [String]] = [:]
         var unmatchedMessageIds: [String] = []
         for message in messages {
-            if let rule = rules.firstMatching(message: message) {
-                arrivedIdsByRuleName[rule.name, default: []].append(message.id)
+            if let index = rules.firstIndex(where: { $0.condition.matches(message: message) }) {
+                arrivedIdsByRuleIndex[index, default: []].append(message.id)
             } else {
                 unmatchedMessageIds.append(message.id)
             }
@@ -79,32 +82,30 @@ public enum NotificationEngine {
 
         var deliveries: [NotificationDelivery] = []
         var updatedStates = states
-        // 新着が無い枠も評価する。保留中メールの期限到来を拾うため。
-        for rule in rules {
+        // 新着が無い枠も評価する。保留中メールの期限到来と、ポリシー変更で取り残された保留を拾うため。
+        for (index, rule) in rules.enumerated() {
             var state = states[rule.name] ?? NotificationRuleState()
-            let arrivedIds = arrivedIdsByRuleName[rule.name] ?? []
+            let targetMessageIds = merged(
+                pendingMessageIds: state.pendingMessageIds,
+                arrivedMessageIds: arrivedIdsByRuleIndex[index] ?? []
+            )
+            guard !targetMessageIds.isEmpty else { continue }
             switch rule.policy {
             case .immediate:
-                guard !arrivedIds.isEmpty else { continue }
-                deliveries.append(NotificationDelivery(ruleName: rule.name, messageIds: arrivedIds))
+                deliveries.append(NotificationDelivery(ruleName: rule.name, messageIds: targetMessageIds))
                 state.lastNotifiedAt = now
                 state.pendingMessageIds = []
             case .batch(let interval):
-                var pendingMessageIds = state.pendingMessageIds
-                for arrivedId in arrivedIds where !pendingMessageIds.contains(arrivedId) {
-                    pendingMessageIds.append(arrivedId)
-                }
-                guard !pendingMessageIds.isEmpty else { continue }
                 // lastNotifiedAt == nil のうちは即時に出す。最初の 1 通で時計を始め、その後は interval ごとにまとめるため。
                 if let lastNotifiedAt = state.lastNotifiedAt, now.timeIntervalSince(lastNotifiedAt) < interval {
-                    state.pendingMessageIds = pendingMessageIds
+                    state.pendingMessageIds = targetMessageIds
                 } else {
-                    deliveries.append(NotificationDelivery(ruleName: rule.name, messageIds: pendingMessageIds))
+                    deliveries.append(NotificationDelivery(ruleName: rule.name, messageIds: targetMessageIds))
                     state.lastNotifiedAt = now
                     state.pendingMessageIds = []
                 }
             case .silent:
-                continue
+                state.pendingMessageIds = []
             }
             updatedStates[rule.name] = state
         }
@@ -114,5 +115,15 @@ public enum NotificationEngine {
             deliveries.append(NotificationDelivery(ruleName: nil, messageIds: unmatchedMessageIds))
         }
         return NotificationDecision(deliveries: deliveries, states: updatedStates)
+    }
+
+    /// 保留中のメール ID の後ろに新着のメール ID を重複なく足したもの。
+    /// 枠のポリシーを後から変えても保留中のメールが消えないよう、どのポリシーでもこの結合を通す。
+    private static func merged(pendingMessageIds: [String], arrivedMessageIds: [String]) -> [String] {
+        var mergedMessageIds = pendingMessageIds
+        for arrivedMessageId in arrivedMessageIds where !mergedMessageIds.contains(arrivedMessageId) {
+            mergedMessageIds.append(arrivedMessageId)
+        }
+        return mergedMessageIds
     }
 }

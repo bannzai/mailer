@@ -57,6 +57,29 @@ private func makeRule(name: String, domain: String, policy: NotificationPolicy) 
     #expect(decision.deferredMessageIds.isEmpty)
 }
 
+@Test func immediateRuleFlushesPendingLeftByPolicyChange() {
+    let decision = NotificationEngine.decide(
+        messages: [],
+        rules: [makeRule(name: "仕事", domain: "example.com", policy: .immediate)],
+        states: ["仕事": NotificationRuleState(pendingMessageIds: ["p1"])],
+        now: now
+    )
+    #expect(decision.deliveries == [NotificationDelivery(ruleName: "仕事", messageIds: ["p1"])])
+    #expect(decision.states["仕事"]?.pendingMessageIds.isEmpty == true)
+    #expect(decision.states["仕事"]?.lastNotifiedAt == now)
+}
+
+@Test func immediateRuleDeliversPendingBeforeArrivals() {
+    let decision = NotificationEngine.decide(
+        messages: [makeMessage(id: "m1", from: "boss@example.com")],
+        rules: [makeRule(name: "仕事", domain: "example.com", policy: .immediate)],
+        states: ["仕事": NotificationRuleState(pendingMessageIds: ["p1"])],
+        now: now
+    )
+    #expect(decision.deliveries == [NotificationDelivery(ruleName: "仕事", messageIds: ["p1", "m1"])])
+    #expect(decision.deferredMessageIds.isEmpty)
+}
+
 @Test func batchRuleNotifiesFirstArrivalImmediately() {
     let decision = NotificationEngine.decide(
         messages: [makeMessage(id: "m1", from: "news@example.com")],
@@ -139,6 +162,33 @@ private func makeRule(name: String, domain: String, policy: NotificationPolicy) 
     #expect(decision.deferredMessageIds.isEmpty)
     #expect(decision.states["無音"]?.pendingMessageIds ?? [] == [])
     #expect(decision.states["無音"]?.lastNotifiedAt == nil)
+}
+
+@Test func silentRuleClearsPendingLeftByPolicyChange() {
+    let decision = NotificationEngine.decide(
+        messages: [],
+        rules: [makeRule(name: "無音", domain: "example.com", policy: .silent)],
+        states: ["無音": NotificationRuleState(pendingMessageIds: ["p1"])],
+        now: now
+    )
+    #expect(decision.deliveries.isEmpty)
+    #expect(decision.deferredMessageIds.isEmpty)
+    #expect(decision.states["無音"]?.pendingMessageIds == [])
+}
+
+@Test func duplicateRuleNamesKeepFirstMatchWins() {
+    let decision = NotificationEngine.decide(
+        messages: [makeMessage(id: "ma", from: "news@a.com"), makeMessage(id: "mb", from: "news@b.com")],
+        rules: [
+            makeRule(name: "重複", domain: "a.com", policy: .silent),
+            makeRule(name: "重複", domain: "b.com", policy: .immediate),
+        ],
+        states: [:],
+        now: now
+    )
+    #expect(decision.deliveries == [NotificationDelivery(ruleName: "重複", messageIds: ["mb"])])
+    #expect(decision.immediateMessageIds == ["mb"])
+    #expect(decision.deferredMessageIds.isEmpty)
 }
 
 @Test func mixedRulesOrderDeliveriesAndKeepUnknownRuleState() {
