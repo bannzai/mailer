@@ -13,6 +13,7 @@ struct MailerCommand: AsyncParsableCommand {
             ArchiveCommand.self,
             LabelCommand.self,
             QuickLabelCommand.self,
+            NotificationRulesCommand.self,
         ]
     )
 }
