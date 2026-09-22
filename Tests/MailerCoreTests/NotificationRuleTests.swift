@@ -110,11 +110,72 @@ private func makeMessage(
     #expect(rules.firstMatching(message: makeMessage(id: "m3", from: "other@other.com")) == nil)
 }
 
+@Test func classificationConditionRequiresClassification() {
+    let condition = NotificationRuleCondition(
+        classification: InquiryClassificationCondition(flags: ["unusable_now"])
+    )
+    #expect(!condition.matches(message: makeMessage(id: "m1")))
+    #expect(!condition.matches(message: makeMessage(id: "m1"), classification: nil))
+    #expect(condition.matches(message: makeMessage(id: "m1"), classification: makeInquiryClassification()))
+}
+
+@Test func classificationConditionMatchesOnlyAdoptedBand() {
+    let flagCondition = InquiryClassificationCondition(flags: ["refund_request"])
+    #expect(flagCondition.matches(classification: makeInquiryClassification(flags: ["refund_request": 0.7])))
+    #expect(!flagCondition.matches(classification: makeInquiryClassification(flags: ["refund_request": 0.5])))
+    #expect(!flagCondition.matches(classification: makeInquiryClassification(flags: ["refund_request": 0.1])))
+    #expect(!flagCondition.matches(classification: makeInquiryClassification(flags: [:])))
+
+    let categoryCondition = InquiryClassificationCondition(categories: ["billing", "bug"])
+    #expect(
+        categoryCondition.matches(classification: makeInquiryClassification(category: "bug", categoryConfidence: 0.9)))
+    #expect(
+        !categoryCondition.matches(classification: makeInquiryClassification(category: "bug", categoryConfidence: 0.6)))
+    #expect(
+        !categoryCondition.matches(
+            classification: makeInquiryClassification(category: "praise", categoryConfidence: 0.9)))
+
+    let severityCondition = InquiryClassificationCondition(severities: ["high"])
+    #expect(
+        severityCondition.matches(classification: makeInquiryClassification(severity: "high", severityConfidence: 0.8)))
+    #expect(
+        !severityCondition.matches(classification: makeInquiryClassification(severity: "high", severityConfidence: 0.4))
+    )
+    #expect(
+        !severityCondition.matches(
+            classification: makeInquiryClassification(severity: "medium", severityConfidence: 0.9)))
+}
+
+@Test func classificationConditionCombinesGroupsWithOrAndOtherFieldsWithAnd() {
+    let condition = NotificationRuleCondition(
+        fromDomain: "example.com",
+        classification: InquiryClassificationCondition(flags: ["unusable_now", "refund_request"], severities: ["high"])
+    )
+    let onlySeverity = makeInquiryClassification(flags: ["unusable_now": 0.1, "refund_request": 0.1])
+    #expect(condition.matches(message: makeMessage(id: "m1", from: "user@example.com"), classification: onlySeverity))
+    let onlyFlag = makeInquiryClassification(severity: "low", flags: ["unusable_now": 0.1, "refund_request": 0.9])
+    #expect(condition.matches(message: makeMessage(id: "m2", from: "user@example.com"), classification: onlyFlag))
+    let neither = makeInquiryClassification(severity: "low", flags: ["unusable_now": 0.1, "refund_request": 0.2])
+    #expect(!condition.matches(message: makeMessage(id: "m3", from: "user@example.com"), classification: neither))
+    #expect(!condition.matches(message: makeMessage(id: "m4", from: "user@other.com"), classification: onlySeverity))
+}
+
 @Test func notificationRuleSurvivesJSONRoundTrip() throws {
     let rules = [
         NotificationRule(
             name: "即時",
             condition: NotificationRuleCondition(fromAddress: "boss@example.com"),
+            policy: .immediate
+        ),
+        NotificationRule(
+            name: "緊急",
+            condition: NotificationRuleCondition(
+                classification: InquiryClassificationCondition(
+                    categories: ["billing"],
+                    flags: ["unusable_now", "refund_request"],
+                    severities: ["high"]
+                )
+            ),
             policy: .immediate
         ),
         NotificationRule(
@@ -129,4 +190,19 @@ private func makeMessage(
         ),
     ]
     #expect(try JSONDecoder().decode([NotificationRule].self, from: JSONEncoder().encode(rules)) == rules)
+}
+
+/// PR #27 で保存した分類条件の無い枠定義 (classification キーが無い JSON) をそのまま読める。
+@Test func notificationRuleDecodesJSONWithoutClassificationKey() throws {
+    let json =
+        #"[{"name": "まとめ", "condition": {"fromDomain": "example.com"}, "policy": {"batch": {"interval": 43200}}}]"#
+    let rules = try JSONDecoder().decode([NotificationRule].self, from: Data(json.utf8))
+    #expect(
+        rules == [
+            NotificationRule(
+                name: "まとめ",
+                condition: NotificationRuleCondition(fromDomain: "example.com"),
+                policy: .batch(interval: 43200)
+            )
+        ])
 }
