@@ -46,6 +46,21 @@ struct NotificationRulesCommand: ParsableCommand {
         @Option(name: .long, help: "メールが持っている必要があるラベル ID (複数指定可)")
         var label: [String] = []
 
+        @Option(
+            name: .long,
+            help: "Jev の判定の種別を条件にする (複数指定可。bug / billing 等、質問定義 review-triage.json の category の名前)"
+        )
+        var category: [String] = []
+
+        @Option(
+            name: .long,
+            help: "Jev の判定の flag を条件にする (複数指定可。unusable_now / refund_request 等、質問定義の flags の名前)"
+        )
+        var flag: [String] = []
+
+        @Option(name: .long, help: "Jev の判定の深刻度を条件にする (複数指定可。none / low / medium / high)")
+        var severity: [String] = []
+
         @Flag(name: .long, help: "新着のたびに通知する")
         var immediate = false
 
@@ -56,8 +71,11 @@ struct NotificationRulesCommand: ParsableCommand {
         var silent = false
 
         func validate() throws {
-            guard from != nil || domain != nil || subject != nil || !label.isEmpty else {
-                throw ValidationError("--from / --domain / --subject / --label のいずれか1つ以上を指定してください。")
+            guard from != nil || domain != nil || subject != nil || !label.isEmpty || classificationCondition != nil
+            else {
+                throw ValidationError(
+                    "--from / --domain / --subject / --label / --category / --flag / --severity のいずれか1つ以上を指定してください。"
+                )
             }
             guard [immediate, batchHours != nil, silent].filter(\.self).count == 1 else {
                 throw ValidationError("--immediate / --batch-hours / --silent のいずれか1つを指定してください。")
@@ -75,12 +93,25 @@ struct NotificationRulesCommand: ParsableCommand {
                         fromAddress: from,
                         fromDomain: domain,
                         subjectContains: subject,
-                        labelIds: label.isEmpty ? nil : label
+                        labelIds: label.isEmpty ? nil : label,
+                        classification: classificationCondition
                     ),
                     policy: policy
                 )
             )
             print("通知枠「\(name)」を保存しました。")
+        }
+
+        /// --category / --flag / --severity のどれかがあれば分類条件 (列挙したいずれかに当たれば合致)。
+        private var classificationCondition: InquiryClassificationCondition? {
+            guard !category.isEmpty || !flag.isEmpty || !severity.isEmpty else {
+                return nil
+            }
+            return InquiryClassificationCondition(
+                categories: category.isEmpty ? nil : category,
+                flags: flag.isEmpty ? nil : flag,
+                severities: severity.isEmpty ? nil : severity
+            )
         }
 
         private var policy: NotificationPolicy {
@@ -104,16 +135,18 @@ struct NotificationRulesCommand: ParsableCommand {
     }
 }
 
-/// 一覧に出す条件の要約 ("from:A domain:D subject:S label:L1,L2" のうち設定済みのものだけ)。
+/// 一覧に出す条件の要約 ("from:A domain:D subject:S label:L1,L2 category:C flag:F severity:S" のうち設定済みのものだけ)。
 private func conditionSummary(condition: NotificationRuleCondition) -> String {
-    [
+    let parts: [String?] = [
         condition.fromAddress.map { "from:\($0)" },
         condition.fromDomain.map { "domain:\($0)" },
         condition.subjectContains.map { "subject:\($0)" },
         condition.labelIds.map { "label:\($0.joined(separator: ","))" },
+        condition.classification?.categories.map { "category:\($0.joined(separator: ","))" },
+        condition.classification?.flags.map { "flag:\($0.joined(separator: ","))" },
+        condition.classification?.severities.map { "severity:\($0.joined(separator: ","))" },
     ]
-    .compactMap(\.self)
-    .joined(separator: " ")
+    return parts.compactMap(\.self).joined(separator: " ")
 }
 
 /// 一覧に出すポリシーの要約。

@@ -20,6 +20,16 @@ enum CLIContext {
         return GmailClient(email: email, tokenProvider: manager.tokenProvider())
     }
 
+    /// Jev の分類器。API キーか質問定義が無い環境では nil (分類なしで受信処理を続ける)。
+    static func inquiryClassifier() throws -> InquiryClassifier? {
+        guard let configuration = try InquiryClassifierConfiguration.load(),
+            let rules = try InquiryRuleDefinition.load()
+        else {
+            return nil
+        }
+        return InquiryClassifier(apiKey: configuration.apiKey, rules: rules)
+    }
+
     /// 認可 URL を既定ブラウザで開く。開けない環境では URL を表示して手動で開いてもらう。
     static func openInBrowser(_ url: URL) {
         let process = Process()
