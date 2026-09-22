@@ -39,7 +39,8 @@ castle 側の定義: https://github.com/bannzai/castle/blob/main/home/.agents/sk
 <本文>
 ```
 
-- 本文は `text/plain` パートを優先し、無ければ `text/html` のタグを落としたもの、どちらも無ければ Gmail の snippet。添付パート (filename 付き・`Content-Disposition: attachment`) とその配下は本文の探索から除く
+- 本文は `text/plain` パートを優先し、無ければ `text/html` のタグを落としたもの (名前付き・数値文字参照を復号)、どちらも無ければ Gmail の snippet。添付パート (filename 付き・`Content-Disposition: attachment`) とその配下は本文の探索から除く
+- 本文パートは Content-Type の charset (ISO-2022-JP・Shift_JIS 等。無ければ UTF-8) で復号する。復号できないメールは文字化けした本文を送らず、そのメールだけ判定なしにする (保存しないため次回も再判定を試みる)
 - 件名を含めた全体を先頭 2,000 文字に切り詰める (`InquiryClassificationPipeline.maxInputCharacters`)。問い合わせの本文は通常数百文字で、それより長いのは引用の返信連鎖や署名のため、先頭だけで判定できる。Jev の state + 質問の上限 32k トークンより十分小さく、1 件の入力を 3,000 トークン前後 ($0.00013 未満) に抑える
 - 送ってよいのは mailer に届く問い合わせメールの本文 (2026-09-20 のユーザー判断)。`mailer classify` は `--query` (必須。例: `to:support@example.com`) で問い合わせの宛先・件名に絞ったメールだけを対象にし、受信トレイ全体には当てない (`--query` 無しでは起動時のエラーで止まる)
 - ヘッダ (From・To 等) と添付は送らない

@@ -1,15 +1,29 @@
 import Foundation
 
+/// 本文の取り出しで起きるエラー。
+public enum GmailMessageBodyError: Error, LocalizedError, Equatable {
+    /// 本文パートの charset が未知か、そのバイト列を charset で復号できない。
+    case undecodableBody(charset: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .undecodableBody(let charset):
+            return "本文を charset \(charset) として復号できません"
+        }
+    }
+}
+
 extension GmailMessage {
     /// 本文をプレーンテキストとして取り出す。text/plain パートを優先し、無ければ text/html のタグを落としたもの、
     /// どちらも無ければ snippet。添付パート (filename 付き・Content-Disposition: attachment) とその配下は本文とみなさない。
+    /// 本文パートは Content-Type の charset (無ければ UTF-8) で復号し、復号できなければ投げる (文字化けした本文を分類に回さない)。
     /// format=full で取得したメッセージでないと payload が無く snippet だけになる。
-    public var plainTextBody: String? {
+    public func plainTextBody() throws -> String? {
         if let textPart = payload?.firstBodyPart(mimeType: "text/plain"), let data = textPart.body?.decodedData {
-            return String(decoding: data, as: UTF8.self)
+            return try textPart.decodeText(data: data)
         }
         if let htmlPart = payload?.firstBodyPart(mimeType: "text/html"), let data = htmlPart.body?.decodedData {
-            return stripHTMLTags(html: String(decoding: data, as: UTF8.self))
+            return stripHTMLTags(html: try htmlPart.decodeText(data: data))
         }
         return snippet
     }
@@ -42,9 +56,38 @@ extension GmailMessagePart {
         }
         return nil
     }
+
+    /// Content-Type ヘッダの charset パラメータ (例: `text/plain; charset="ISO-2022-JP"` の ISO-2022-JP)。無ければ nil。
+    var charset: String? {
+        guard
+            let contentType = headers?.first(where: { $0.name.caseInsensitiveCompare("Content-Type") == .orderedSame })?
+                .value,
+            let range = contentType.range(of: "charset=", options: .caseInsensitive)
+        else {
+            return nil
+        }
+        let value = contentType[range.upperBound...].split(separator: ";").first.map(String.init) ?? ""
+        return value.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+    }
+
+    /// パートのバイト列を charset で復号する。charset が無いパートは UTF-8 (us-ascii の上位互換) として読む。
+    func decodeText(data: Data) throws -> String {
+        let charsetName = charset ?? "utf-8"
+        let cfEncoding = CFStringConvertIANACharSetNameToEncoding(charsetName as CFString)
+        guard cfEncoding != kCFStringEncodingInvalidId,
+            let text = String(
+                data: data,
+                encoding: String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(cfEncoding))
+            )
+        else {
+            throw GmailMessageBodyError.undecodableBody(charset: charsetName)
+        }
+        return text
+    }
 }
 
-/// HTML からタグを落として本文のテキストだけを残す。分類に送る用途なので、レイアウトの再現はしない。
+/// HTML からタグを落とし、文字参照 (名前付きの主要なものと 10 進・16 進の数値文字参照) を復号して本文のテキストだけを残す。
+/// 分類に送る用途なので、レイアウトの再現はしない。
 func stripHTMLTags(html: String) -> String {
     var text = html
     for pattern in ["<style[^>]*>[\\s\\S]*?</style>", "<script[^>]*>[\\s\\S]*?</script>"] {
@@ -53,11 +96,37 @@ func stripHTMLTags(html: String) -> String {
     text = text.replacingOccurrences(
         of: "<br\\s*/?>|</p>|</div>|</tr>|</li>", with: "\n", options: [.regularExpression, .caseInsensitive])
     text = text.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+    text = decodeNumericCharacterReferences(text: text)
+    // &amp; は最後に戻す。先に戻すと "&amp;lt;" のような二重エスケープが "<" に化けるため。
     for (entity, replacement) in [
-        ("&nbsp;", " "), ("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""), ("&#39;", "'"),
+        ("&nbsp;", " "), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""), ("&apos;", "'"), ("&amp;", "&"),
     ] {
         text = text.replacingOccurrences(of: entity, with: replacement)
     }
     return text.replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
         .trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+/// `&#36820;` (10 進) と `&#x8FD4;` (16 進) の数値文字参照を文字に戻す。Unicode スカラーにならない値はそのまま残す。
+private func decodeNumericCharacterReferences(text: String) -> String {
+    let pattern = try! NSRegularExpression(pattern: "&#(?:[xX]([0-9a-fA-F]+)|([0-9]+));")
+    let nsText = text as NSString
+    var result = ""
+    var cursor = 0
+    for match in pattern.matches(in: text, range: NSRange(location: 0, length: nsText.length)) {
+        result += nsText.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+        let hex = match.range(at: 1)
+        let codePoint =
+            hex.location != NSNotFound
+            ? UInt32(nsText.substring(with: hex), radix: 16)
+            : UInt32(nsText.substring(with: match.range(at: 2)))
+        if let codePoint, let scalar = Unicode.Scalar(codePoint) {
+            result.unicodeScalars.append(scalar)
+        } else {
+            result += nsText.substring(with: match.range)
+        }
+        cursor = match.range.location + match.range.length
+    }
+    result += nsText.substring(from: cursor)
+    return result
 }

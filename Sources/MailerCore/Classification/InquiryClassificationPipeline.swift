@@ -44,21 +44,25 @@ public struct InquiryClassificationPipeline: Sendable {
     }
 
     /// Jev に送るテキスト。件名を 1 行目に置き、本文を続けて maxInputCharacters に切り詰める。
-    public static func inputText(message: GmailMessage) -> String {
+    /// 本文を charset で復号できないメールは投げる (文字化けした本文の判定を保存しないため)。
+    public static func inputText(message: GmailMessage) throws -> String {
         let subject = message.subject.map { "件名: \($0)\n\n" } ?? ""
-        let body = message.plainTextBody?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let body = try message.plainTextBody()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return String((subject + body).prefix(maxInputCharacters))
     }
 
     /// メール集合を分類する。保存済みのメールは API を呼ばず保存値を返す (冪等)。
     /// メールは metadata 形式でよく、未判定のものだけ format=full で本文を取り直す。
     /// API が 1 度失敗したら、残りのメールは判定なしにして API を呼ばない (不達時に件数分待たないため)。
+    /// 本文を復号できないメールはそのメールだけ判定なしにし、残りは続ける。
     public func classify(messages: [GmailMessage]) async -> InquiryClassificationRun {
         var stored = (try? store.load(account: gmail.email)) ?? [:]
         var result: [String: InquiryClassification] = [:]
         var classifiedMessageIds: [String] = []
         var unavailableMessageIds: [String] = []
         var unavailableReason: String? = classifier == nil ? "TYPESAFE_API_KEY か質問定義が無いため分類を利用できません" : nil
+        // 本文を復号できないメールの理由。API の失敗と違い残りのメールは続けるため、unavailableReason とは分けて持つ。
+        var undecodableReason: String?
 
         for message in messages {
             if let existing = stored[message.id] {
@@ -71,11 +75,14 @@ public struct InquiryClassificationPipeline: Sendable {
             }
             do {
                 let fullMessage = try await gmail.getMessage(id: message.id, format: .full)
-                let classification = try await classifier.classify(text: Self.inputText(message: fullMessage))
+                let classification = try await classifier.classify(text: try Self.inputText(message: fullMessage))
                 stored[message.id] = classification
                 try store.save(stored, account: gmail.email)
                 result[message.id] = classification
                 classifiedMessageIds.append(message.id)
+            } catch let error as GmailMessageBodyError {
+                undecodableReason = error.localizedDescription
+                unavailableMessageIds.append(message.id)
             } catch {
                 unavailableReason = error.localizedDescription
                 unavailableMessageIds.append(message.id)
@@ -85,7 +92,7 @@ public struct InquiryClassificationPipeline: Sendable {
             classifications: result,
             classifiedMessageIds: classifiedMessageIds,
             unavailableMessageIds: unavailableMessageIds,
-            unavailableReason: unavailableMessageIds.isEmpty ? nil : unavailableReason
+            unavailableReason: unavailableMessageIds.isEmpty ? nil : (unavailableReason ?? undecodableReason)
         )
     }
 }

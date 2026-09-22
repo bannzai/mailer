@@ -96,6 +96,25 @@ private func makePipeline(
     #expect(gmailTestRequests(transport).count == 1)
 }
 
+/// 本文を復号できないメールはそのメールだけ判定なしにし、残りのメールは判定を続ける。
+@Test func pipelineSkipsUndecodableBodyAndContinues() async throws {
+    let store = makeInquiryTestStore()
+    let undecodable =
+        #"{"id": "m1", "payload": {"mimeType": "text/plain", "headers": [{"name": "Content-Type", "value": "text/plain; charset=\"x-nope\""}], "body": {"data": "eA"}}}"#
+    let transport = makeInquiryTestTransport(
+        gmailResponses: [(200, undecodable), (200, fullMessageJSON(id: "m2"))],
+        jev: jevSuccess
+    )
+    let run = await makePipeline(transport: transport, store: store)
+        .classify(messages: [metadataMessage(id: "m1"), metadataMessage(id: "m2")])
+
+    #expect(run.unavailableMessageIds == ["m1"])
+    #expect(run.unavailableReason == GmailMessageBodyError.undecodableBody(charset: "x-nope").localizedDescription)
+    #expect(run.classifiedMessageIds == ["m2"])
+    #expect(try store.load(account: "a@example.com").keys.sorted() == ["m2"])
+    #expect(jevTestRequests(transport).count == 1)
+}
+
 @Test func pipelineTreatsTimeoutAsUnavailable() async throws {
     let store = makeInquiryTestStore()
     let transport = makeInquiryTestTransport(
