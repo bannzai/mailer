@@ -15,11 +15,18 @@ struct ClassifyCommand: AsyncParsableCommand {
     @Option(name: .long, help: "対象にする受信トレイの最大件数")
     var max: Int = 30
 
+    /// 必須。受信トレイ全体を送ると問い合わせ以外の私信まで外部 API に渡るため、対象を明示しない実行では分類しない。
     @Option(
         name: .long,
-        help: "対象を絞る Gmail の検索クエリ (例: to:support@example.com)。Jev に送ってよいのは問い合わせメールの本文なので、問い合わせが届く宛先や件名で絞る"
+        help: "対象を絞る Gmail の検索クエリ (必須。例: to:support@example.com)。Jev に送ってよいのは問い合わせメールの本文なので、問い合わせが届く宛先や件名で絞る"
     )
-    var query: String?
+    var query: String
+
+    func validate() throws {
+        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else {
+            throw ValidationError("--query に問い合わせメールを絞る検索クエリを指定してください (例: to:support@example.com)。")
+        }
+    }
 
     func run() async throws {
         let client = try CLIContext.gmailClient(explicitAccount: accountOptions.account)

@@ -30,15 +30,41 @@ private func makeMessage(subject: String? = nil, snippet: String? = nil, parts: 
     )
 }
 
-private func makePart(mimeType: String, text: String) -> GmailMessagePart {
+private func makePart(
+    mimeType: String,
+    text: String,
+    filename: String? = nil,
+    headers: [GmailHeader]? = nil
+) -> GmailMessagePart {
     GmailMessagePart(
         partId: nil,
         mimeType: mimeType,
-        filename: nil,
-        headers: nil,
+        filename: filename,
+        headers: headers,
         body: GmailMessagePartBody(size: text.utf8.count, data: base64url(text)),
         parts: nil
     )
+}
+
+@Test func plainTextBodySkipsAttachmentsAndTheirChildren() {
+    let message = makeMessage(parts: [
+        makePart(mimeType: "text/plain", text: "添付のテキスト", filename: "log.txt"),
+        makePart(
+            mimeType: "text/plain",
+            text: "inline 指定の添付",
+            headers: [GmailHeader(name: "Content-Disposition", value: "attachment; filename=\"a.txt\"")]
+        ),
+        GmailMessagePart(
+            partId: nil,
+            mimeType: "multipart/mixed",
+            filename: "bundle.eml",
+            headers: nil,
+            body: nil,
+            parts: [makePart(mimeType: "text/plain", text: "添付の中の本文")]
+        ),
+        makePart(mimeType: "text/html", text: "<p>本文</p>"),
+    ])
+    #expect(message.plainTextBody == "本文")
 }
 
 @Test func plainTextBodyPrefersTextPlainPart() {
