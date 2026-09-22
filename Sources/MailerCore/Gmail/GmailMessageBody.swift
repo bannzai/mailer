@@ -58,16 +58,24 @@ extension GmailMessagePart {
     }
 
     /// Content-Type ヘッダの charset パラメータ (例: `text/plain; charset="ISO-2022-JP"` の ISO-2022-JP)。無ければ nil。
+    /// パラメータは `;` 区切りで、名前と値の間の `=` の前後に空白があってもよい (RFC 2045 の tspecials の扱い)。
     var charset: String? {
         guard
             let contentType = headers?.first(where: { $0.name.caseInsensitiveCompare("Content-Type") == .orderedSame })?
-                .value,
-            let range = contentType.range(of: "charset=", options: .caseInsensitive)
+                .value
         else {
             return nil
         }
-        let value = contentType[range.upperBound...].split(separator: ";").first.map(String.init) ?? ""
-        return value.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+        for parameter in contentType.split(separator: ";").dropFirst() {
+            let pair = parameter.split(separator: "=", maxSplits: 1).map {
+                $0.trimmingCharacters(in: .whitespaces)
+            }
+            guard pair.count == 2, pair[0].caseInsensitiveCompare("charset") == .orderedSame else {
+                continue
+            }
+            return pair[1].trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+        }
+        return nil
     }
 
     /// パートのバイト列を charset で復号する。charset が無いパートは UTF-8 (us-ascii の上位互換) として読む。

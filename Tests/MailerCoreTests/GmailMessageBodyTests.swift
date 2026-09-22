@@ -37,6 +37,23 @@ private func makeEncodedPart(mimeType: String, bytes: Data, charset: String) -> 
             .plainTextBody() == "起動しない")
 }
 
+@Test func charsetParameterAllowsWhitespaceAroundEqualsAndOtherParameters() throws {
+    let iso2022 = try #require("返金してください".data(using: .iso2022JP))
+    let part = GmailMessagePart(
+        partId: nil,
+        mimeType: "text/plain",
+        filename: nil,
+        headers: [GmailHeader(name: "content-type", value: "text/plain; format=flowed; Charset = 'ISO-2022-JP' ; x=1")],
+        body: GmailMessagePartBody(size: iso2022.count, data: base64url(iso2022)),
+        parts: nil
+    )
+    #expect(part.charset == "ISO-2022-JP")
+    #expect(try makeMessage(parts: [part]).plainTextBody() == "返金してください")
+    #expect(
+        makePart(mimeType: "text/plain", text: "x", headers: [GmailHeader(name: "Content-Type", value: "text/plain")])
+            .charset == nil)
+}
+
 @Test func plainTextBodyThrowsWhenCharsetCannotDecode() throws {
     let message = makeMessage(
         snippet: "スニペット",
