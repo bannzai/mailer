@@ -218,6 +218,52 @@ private func makeRule(name: String, domain: String, policy: NotificationPolicy) 
     #expect(decision.states["削除済みの枠"]?.pendingMessageIds == ["x1"])
 }
 
+/// issue #28 の例: 深刻度 high または unusable_now / refund_request が採用帯のメールは即時通知、それ以外の問い合わせは 12 時間ごとにまとめる。
+@Test func decideRoutesByClassificationAndFallsBackWithoutIt() {
+    let rules = [
+        NotificationRule(
+            name: "緊急",
+            condition: NotificationRuleCondition(
+                classification: InquiryClassificationCondition(
+                    flags: ["unusable_now", "refund_request"], severities: ["high"])
+            ),
+            policy: .immediate
+        ),
+        NotificationRule(
+            name: "問い合わせまとめ",
+            condition: NotificationRuleCondition(fromDomain: "example.com"),
+            policy: .batch(interval: twelveHours)
+        ),
+    ]
+    let decision = NotificationEngine.decide(
+        messages: [
+            makeMessage(id: "urgent", from: "a@example.com"),
+            makeMessage(id: "uncertain", from: "b@example.com"),
+            makeMessage(id: "calm", from: "c@example.com"),
+            makeMessage(id: "unclassified", from: "d@example.com"),
+        ],
+        rules: rules,
+        states: ["問い合わせまとめ": NotificationRuleState(lastNotifiedAt: now.addingTimeInterval(-3600))],
+        now: now,
+        classifications: [
+            "urgent": makeInquiryClassification(),
+            "uncertain": makeInquiryClassification(
+                severity: "high",
+                severityConfidence: 0.5,
+                flags: ["unusable_now": 0.6, "refund_request": 0.4]
+            ),
+            "calm": makeInquiryClassification(
+                category: "praise",
+                severity: "none",
+                severityConfidence: 0.95,
+                flags: ["unusable_now": 0.01, "refund_request": 0.02]
+            ),
+        ]
+    )
+    #expect(decision.deliveries == [NotificationDelivery(ruleName: "緊急", messageIds: ["urgent"])])
+    #expect(decision.deferredMessageIds == ["問い合わせまとめ": ["uncertain", "calm", "unclassified"]])
+}
+
 @Test func decideSplitsArrivalsIntoImmediateAndDeferred() {
     let decision = NotificationEngine.decide(
         messages: [

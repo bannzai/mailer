@@ -11,21 +11,31 @@ public struct NotificationRuleCondition: Codable, Sendable, Equatable {
     public var subjectContains: String?
     /// メールが持っている必要があるラベル ID (すべて含む必要がある)。
     public var labelIds: [String]?
+    /// Jev の判定結果に対する条件。判定が無い (API 不達・未判定) メールと不確実帯の判定は合致しない。
+    public var classification: InquiryClassificationCondition?
 
     public init(
         fromAddress: String? = nil,
         fromDomain: String? = nil,
         subjectContains: String? = nil,
-        labelIds: [String]? = nil
+        labelIds: [String]? = nil,
+        classification: InquiryClassificationCondition? = nil
     ) {
         self.fromAddress = fromAddress
         self.fromDomain = fromDomain
         self.subjectContains = subjectContains
         self.labelIds = labelIds
+        self.classification = classification
     }
 
     /// メールがこの条件に合致するか。From ヘッダが無い・アドレスを取り出せないメールは fromAddress / fromDomain の条件に合致しない。
-    public func matches(message: GmailMessage) -> Bool {
+    /// classification を要求する条件は、判定結果が渡されない (nil) メールに合致しない。
+    public func matches(message: GmailMessage, classification result: InquiryClassification? = nil) -> Bool {
+        if let classification {
+            guard classification.matches(classification: result) else {
+                return false
+            }
+        }
         if let fromAddress {
             guard let header = message.from,
                 let address = EmailAddress.extract(fromHeader: header),
@@ -89,7 +99,49 @@ public struct NotificationRule: Codable, Sendable, Equatable, Identifiable {
 
 extension Array where Element == NotificationRule {
     /// メールが属する枠。先頭から評価して最初に合致した枠を返し、どれにも合致しなければ nil。
-    public func firstMatching(message: GmailMessage) -> NotificationRule? {
-        first { $0.condition.matches(message: message) }
+    public func firstMatching(message: GmailMessage, classification: InquiryClassification? = nil) -> NotificationRule?
+    {
+        first { $0.condition.matches(message: message, classification: classification) }
+    }
+}
+
+/// Jev の判定結果に対する条件。列挙した種別・flag・深刻度のいずれかが採用帯で当たれば合致する (OR)。
+/// issue #28 の例「深刻度 high または unusable_now / refund_request が閾値以上なら即時通知」を 1 つの枠で表せるようにするため。
+/// AND で絞りたい時は、差出人・件名などの他のフィールドと組み合わせる。
+public struct InquiryClassificationCondition: Codable, Sendable, Equatable {
+    /// 合致させる種別の名前 (質問定義の category の選択肢名)。種別の確信度が採用帯の時だけ当たる。
+    public var categories: [String]?
+    /// 合致させる flag の名前。その flag の確率が採用帯の時だけ当たる。
+    public var flags: [String]?
+    /// 合致させる深刻度の段階名 (質問定義の severity.levels)。深刻度の確信度が採用帯の時だけ当たる。
+    public var severities: [String]?
+
+    public init(categories: [String]? = nil, flags: [String]? = nil, severities: [String]? = nil) {
+        self.categories = categories
+        self.flags = flags
+        self.severities = severities
+    }
+
+    /// 判定結果がこの条件に合致するか。判定が無い (nil) 時と、該当するものが不確実帯・却下帯の時は合致しない。
+    public func matches(classification: InquiryClassification?) -> Bool {
+        guard let classification else {
+            return false
+        }
+        if let categories, categories.contains(classification.category),
+            InquiryClassificationBand(probability: classification.categoryConfidence) == .adopted
+        {
+            return true
+        }
+        if let flags,
+            flags.contains(where: { InquiryClassificationBand(probability: classification.flags[$0] ?? 0) == .adopted })
+        {
+            return true
+        }
+        if let severities, severities.contains(classification.severity),
+            InquiryClassificationBand(probability: classification.severityConfidence) == .adopted
+        {
+            return true
+        }
+        return false
     }
 }

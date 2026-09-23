@@ -63,17 +63,21 @@ public enum NotificationEngine {
     ///   - rules: 枠定義 (先頭から評価し最初に合致した枠に属する)。
     ///   - states: 前回判定後の枠ごとの状態。
     ///   - now: 判定時刻。
+    ///   - classifications: メール ID -> Jev の判定結果。無いメールは判定結果を要求する枠に合致せず、残りの枠と defaultPolicy で扱う。
     public static func decide(
         messages: [GmailMessage],
         rules: [NotificationRule],
         states: [String: NotificationRuleState],
-        now: Date
+        now: Date,
+        classifications: [String: InquiryClassification] = [:]
     ) -> NotificationDecision {
         // 同名の枠があっても先に定義した枠が勝つよう、名前ではなく rules 内の位置で振り分ける。
         var arrivedIdsByRuleIndex: [Int: [String]] = [:]
         var unmatchedMessageIds: [String] = []
         for message in messages {
-            if let index = rules.firstIndex(where: { $0.condition.matches(message: message) }) {
+            if let index = rules.firstIndex(where: {
+                $0.condition.matches(message: message, classification: classifications[message.id])
+            }) {
                 arrivedIdsByRuleIndex[index, default: []].append(message.id)
             } else {
                 unmatchedMessageIds.append(message.id)
