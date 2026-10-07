@@ -43,8 +43,8 @@ iOS: xcodeproj
 xcodeproj:
 	xcodegen generate
 
-# 引数なしの make で動作確認 (verify) を実行する
-.DEFAULT_GOAL := verify
+# 引数なしの make で iOS を実行する (人が手で動作確認するための入口。検査・テストは CI が行う)
+.DEFAULT_GOAL := iOS
 
 .PHONY: verify
 verify:
