@@ -51,22 +51,22 @@ struct ClassifyCommand: AsyncParsableCommand {
             return results.sorted { $0.0 < $1.0 }.map(\.1)
         }
 
-        let run = await InquiryClassificationPipeline(
+        let inquiryClassificationRun = await InquiryClassificationPipeline(
             gmail: client,
             classifier: try CLIContext.inquiryClassifier(),
             store: InquiryClassificationStore()
         ).classify(messages: messages)
         let rules = try NotificationRuleStore().load()
         for message in messages {
-            let classification = run.classifications[message.id]
+            let classification = inquiryClassificationRun.classifications[message.id]
             print(
                 "\(message.summaryLine)  \(classificationSummary(classification: classification))  枠=\(rules.firstMatching(message: message, classification: classification)?.name ?? "枠なし")"
             )
         }
         print(
-            "判定: 新規 \(run.classifiedMessageIds.count) 件 / 保存済み \(run.classifications.count - run.classifiedMessageIds.count) 件 / 判定なし \(run.unavailableMessageIds.count) 件"
+            "判定: 新規 \(inquiryClassificationRun.classifiedMessageIds.count) 件 / 保存済み \(inquiryClassificationRun.classifications.count - inquiryClassificationRun.classifiedMessageIds.count) 件 / 判定なし \(inquiryClassificationRun.unavailableMessageIds.count) 件"
         )
-        if let reason = run.unavailableReason {
+        if let reason = inquiryClassificationRun.unavailableReason {
             print("判定なしの理由: \(reason)")
         }
     }

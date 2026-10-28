@@ -6,6 +6,7 @@ public struct InquiryClassifierConfiguration: Codable, Sendable, Equatable {
     /// TypeSafe の API キー (https://console.typesafe.ai/settings/keys で発行)。
     public var apiKey: String
 
+    /// モジュール外 (CLI) から組み立てるための memberwise init (自動生成は internal のため)。
     public init(apiKey: String) {
         self.apiKey = apiKey
     }
@@ -35,6 +36,7 @@ public enum InquiryClassifierError: Error, LocalizedError, Equatable {
     /// 深刻度のスコアが levels の範囲外。
     case severityOutOfRange(Double)
 
+    /// 判定なしの理由として CLI・保存結果に出す日本語の説明。
     public var errorDescription: String? {
         switch self {
         case .httpStatus(let statusCode):
@@ -71,7 +73,7 @@ public struct InquiryClassifier: Sendable {
     /// 1 リクエストの最大待ち時間 (秒)。
     let timeout: TimeInterval
 
-    /// retryDelays と timeout の既定値は上の定数の根拠に従う。テストでは 0 と短い timeout を注入する。
+    /// 依存を注入して作る。retryDelays と timeout の既定値は上の定数の根拠に従う。テストでは 0 と短い timeout を注入する。
     public init(
         apiKey: String,
         rules: InquiryRuleDefinition,
@@ -97,17 +99,17 @@ public struct InquiryClassifier: Sendable {
         var retryIndex = 0
         var didRetryTimeout = false
         while true {
-            let data: Data
+            let responseBody: Data
             let response: HTTPURLResponse
             do {
-                (data, response) = try await transport.send(request)
+                (responseBody, response) = try await transport.send(request)
             } catch let error as URLError where error.code == .timedOut && !didRetryTimeout {
                 didRetryTimeout = true
                 continue
             }
             switch response.statusCode {
             case 200..<300:
-                return try Self.parse(data: data, rules: rules, now: now)
+                return try Self.parse(data: responseBody, rules: rules, now: now)
             case 429, 529:
                 guard retryIndex < retryDelays.count else {
                     throw InquiryClassifierError.httpStatus(response.statusCode)

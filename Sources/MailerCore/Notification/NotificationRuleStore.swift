@@ -7,6 +7,7 @@ public enum NotificationRuleStoreError: Error, LocalizedError, Equatable {
     /// 同じ名前の枠が複数ある。状態は名前をキーに持つため、同名の枠は保存も読み込みも受け付けない。
     case duplicateRuleName(String)
 
+    /// CLI のエラー表示に出す日本語の説明。
     public var errorDescription: String? {
         switch self {
         case .unknownRule(let name):

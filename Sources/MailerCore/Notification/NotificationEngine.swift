@@ -7,6 +7,7 @@ public struct NotificationRuleState: Codable, Sendable, Equatable {
     /// 次回バッチまで保留しているメール ID (受信順)。
     public var pendingMessageIds: [String]
 
+    /// 一度も通知していない初期状態を既定にする memberwise init (自動生成は internal のため public で書く)。
     public init(lastNotifiedAt: Date? = nil, pendingMessageIds: [String] = []) {
         self.lastNotifiedAt = lastNotifiedAt
         self.pendingMessageIds = pendingMessageIds
@@ -20,6 +21,7 @@ public struct NotificationDelivery: Sendable, Equatable {
     /// 通知するメール ID (保留していたものが先、新着が後)。
     public let messageIds: [String]
 
+    /// モジュール外 (テスト) から組み立てるための memberwise init (自動生成は internal のため)。
     public init(ruleName: String?, messageIds: [String]) {
         self.ruleName = ruleName
         self.messageIds = messageIds
@@ -33,6 +35,7 @@ public struct NotificationDecision: Sendable, Equatable {
     /// 判定後の枠ごとの状態。永続化する値そのもの (入力 states のうち rules に無い枠の状態もそのまま残す)。
     public let states: [String: NotificationRuleState]
 
+    /// モジュール外 (テスト) から組み立てるための memberwise init (自動生成は internal のため)。
     public init(deliveries: [NotificationDelivery], states: [String: NotificationRuleState]) {
         self.deliveries = deliveries
         self.states = states

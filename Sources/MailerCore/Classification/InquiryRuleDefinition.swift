@@ -10,6 +10,7 @@ public struct InquiryRuleDefinition: Codable, Sendable, Equatable {
         /// 選択肢名 (flag では "true" / "false") ごとの判定基準。
         public let criteria: [String: String]
 
+        /// モジュール外 (テスト) から組み立てるための memberwise init (自動生成は internal のため)。
         public init(instructions: String, criteria: [String: String]) {
             self.instructions = instructions
             self.criteria = criteria
@@ -23,6 +24,7 @@ public struct InquiryRuleDefinition: Codable, Sendable, Equatable {
         /// 深刻度の段階名 (低い順)。
         public let levels: [String]
 
+        /// モジュール外 (テスト) から組み立てるための memberwise init (自動生成は internal のため)。
         public init(instructions: String, levels: [String]) {
             self.instructions = instructions
             self.levels = levels
@@ -40,6 +42,7 @@ public struct InquiryRuleDefinition: Codable, Sendable, Equatable {
     /// 深刻度の質問。
     public let severity: Severity
 
+    /// モジュール外 (テスト) から組み立てるための memberwise init (自動生成は internal のため)。
     public init(
         threshold: Double,
         attentionFlags: [String],

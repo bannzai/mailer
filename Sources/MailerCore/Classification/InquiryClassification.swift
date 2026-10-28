@@ -20,6 +20,7 @@ public struct InquiryClassification: Codable, Sendable, Equatable {
     /// 判定した時刻。
     public let classifiedAt: Date
 
+    /// モジュール外 (CLI・アプリ・テスト) から組み立てるための memberwise init (自動生成は internal のため)。
     public init(
         category: String,
         categoryConfidence: Double,
@@ -79,6 +80,7 @@ public struct InquiryClassificationStore: Sendable {
     /// 保存先の classifications.json。
     let fileURL: URL
 
+    /// 保存先ディレクトリを指定して作る。既定は他の設定ファイルと同じ MailerPaths.configDirectory。テストでは一時ディレクトリを渡す。
     public init(directory: URL = MailerPaths.configDirectory) {
         self.fileURL = directory.appendingPathComponent("classifications.json")
     }

@@ -7,6 +7,7 @@ public enum GmailMessageBodyError: Error, LocalizedError, Equatable {
     /// 本文パートが大きく、Gmail が data ではなく attachmentId を返した。本文の取得に別リクエストが要る。
     case bodyRequiresAttachmentFetch(attachmentId: String)
 
+    /// 判定なしの理由として CLI・保存結果に出す日本語の説明。
     public var errorDescription: String? {
         switch self {
         case .undecodableBody(let charset):

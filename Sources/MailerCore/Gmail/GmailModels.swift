@@ -23,6 +23,7 @@ public struct GmailMessagePartBody: Codable, Sendable, Equatable {
     /// 本文が大きい時に Gmail が data の代わりに返す添付 ID (users.messages.attachments.get で取得する)。
     public let attachmentId: String?
 
+    /// attachmentId を省略できるようにするため手書きする (memberwise init は既定値を持てない。既存の呼び出しを変えないため)。
     public init(size: Int?, data: String?, attachmentId: String? = nil) {
         self.size = size
         self.data = data
@@ -31,7 +32,8 @@ public struct GmailMessagePartBody: Codable, Sendable, Equatable {
 
     public var decodedData: Data? {
         guard let data else { return nil }
-        var base64 = data
+        var base64 =
+            data
             .replacingOccurrences(of: "-", with: "+")
             .replacingOccurrences(of: "_", with: "/")
         while base64.count % 4 != 0 {

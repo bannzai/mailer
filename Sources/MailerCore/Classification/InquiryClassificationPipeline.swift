@@ -11,6 +11,7 @@ public struct InquiryClassificationRun: Sendable, Equatable {
     /// 判定できなかった理由 (API キー・質問定義が無い、API 不達・タイムアウト等)。判定できなかったメールが無ければ nil。
     public let unavailableReason: String?
 
+    /// モジュール外 (テスト) から組み立てるための memberwise init (自動生成は internal のため)。
     public init(
         classifications: [String: InquiryClassification],
         classifiedMessageIds: [String],
@@ -39,6 +40,7 @@ public struct InquiryClassificationPipeline: Sendable {
     /// 判定結果の保存先。保存済みのメールは API を呼ばない。
     let store: InquiryClassificationStore
 
+    /// 依存を注入して作る。classifier が nil の環境では全メールを判定なしとして返す。
     public init(gmail: GmailClient, classifier: InquiryClassifier?, store: InquiryClassificationStore) {
         self.gmail = gmail
         self.classifier = classifier

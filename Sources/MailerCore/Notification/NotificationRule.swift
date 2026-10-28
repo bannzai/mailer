@@ -14,6 +14,7 @@ public struct NotificationRuleCondition: Codable, Sendable, Equatable {
     /// Jev の判定結果に対する条件。判定が無い (API 不達・未判定) メールと不確実帯の判定は合致しない。
     public var classification: InquiryClassificationCondition?
 
+    /// 全フィールド nil (すべてのメールに合致) を既定にする memberwise init (自動生成は internal のため public で書く)。
     public init(
         fromAddress: String? = nil,
         fromDomain: String? = nil,
@@ -91,6 +92,7 @@ public struct NotificationRule: Codable, Sendable, Equatable, Identifiable {
     /// Identifiable 用の識別子。名前をそのまま使う。
     public var id: String { name }
 
+    /// モジュール外 (CLI・テスト) から組み立てるための memberwise init (自動生成は internal のため)。
     public init(name: String, condition: NotificationRuleCondition, policy: NotificationPolicy) {
         self.name = name
         self.condition = condition
@@ -117,6 +119,7 @@ public struct InquiryClassificationCondition: Codable, Sendable, Equatable {
     /// 合致させる深刻度の段階名 (質問定義の severity.levels)。深刻度の確信度が採用帯の時だけ当たる。
     public var severities: [String]?
 
+    /// 全フィールド nil を既定にする memberwise init (自動生成は internal のため public で書く)。
     public init(categories: [String]? = nil, flags: [String]? = nil, severities: [String]? = nil) {
         self.categories = categories
         self.flags = flags
