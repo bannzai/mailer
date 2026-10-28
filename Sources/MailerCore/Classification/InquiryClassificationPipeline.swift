@@ -80,7 +80,7 @@ public struct InquiryClassificationPipeline: Sendable {
                     text: try Self.inputText(message: try await gmail.getMessage(id: message.id, format: .full))
                 )
                 stored[message.id] = classification
-                try store.save(stored, account: gmail.email)
+                try store.save(classifications: stored, account: gmail.email)
                 result[message.id] = classification
                 classifiedMessageIds.append(message.id)
             } catch let error as GmailMessageBodyError {

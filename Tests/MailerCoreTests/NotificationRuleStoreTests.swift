@@ -22,18 +22,18 @@ private func makeRule(name: String, policy: NotificationPolicy) -> NotificationR
 
 @Test func notificationRuleStoreAddReplacesRuleWithSameName() throws {
     let store = NotificationRuleStore(directory: makeTestDirectory())
-    try store.add(makeRule(name: "まとめ", policy: .immediate))
-    try store.add(makeRule(name: "無音", policy: .silent))
+    try store.add(rule: makeRule(name: "まとめ", policy: .immediate))
+    try store.add(rule: makeRule(name: "無音", policy: .silent))
     #expect(try store.load() == [makeRule(name: "まとめ", policy: .immediate), makeRule(name: "無音", policy: .silent)])
 
-    try store.add(makeRule(name: "まとめ", policy: .batch(interval: 43200)))
+    try store.add(rule: makeRule(name: "まとめ", policy: .batch(interval: 43200)))
     #expect(try store.load().count == 2)
     #expect(try store.load()[0] == makeRule(name: "まとめ", policy: .batch(interval: 43200)))
 }
 
 @Test func notificationRuleStoreRemoveRejectsUnknownName() throws {
     let store = NotificationRuleStore(directory: makeTestDirectory())
-    try store.add(makeRule(name: "まとめ", policy: .immediate))
+    try store.add(rule: makeRule(name: "まとめ", policy: .immediate))
     try store.remove(name: "まとめ")
     #expect(try store.load().isEmpty)
     #expect(throws: NotificationRuleStoreError.unknownRule("まとめ")) {
@@ -45,7 +45,7 @@ private func makeRule(name: String, policy: NotificationPolicy) -> NotificationR
     let directory = makeTestDirectory()
     let store = NotificationRuleStore(directory: directory)
     #expect(throws: NotificationRuleStoreError.duplicateRuleName("まとめ")) {
-        try store.save([makeRule(name: "まとめ", policy: .immediate), makeRule(name: "まとめ", policy: .silent)])
+        try store.save(rules: [makeRule(name: "まとめ", policy: .immediate), makeRule(name: "まとめ", policy: .silent)])
     }
 
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -64,9 +64,21 @@ private func makeRule(name: String, policy: NotificationPolicy) -> NotificationR
         "まとめ": NotificationRuleState(
             lastNotifiedAt: Date(timeIntervalSince1970: 1_700_000_000), pendingMessageIds: ["m1"])
     ]
-    try store.save(statesOfA, account: "a@example.com")
-    try store.save(["仕事": NotificationRuleState(pendingMessageIds: ["m2"])], account: "b@example.com")
+    try store.save(states: statesOfA, account: "a@example.com")
+    try store.save(states: ["仕事": NotificationRuleState(pendingMessageIds: ["m2"])], account: "b@example.com")
 
     #expect(try store.load(account: "a@example.com") == statesOfA)
+    #expect(try store.load(account: "b@example.com")["仕事"]?.pendingMessageIds == ["m2"])
+}
+
+@Test func notificationStateStoreRemovesOnlyTheGivenAccount() throws {
+    let store = NotificationStateStore(directory: makeTestDirectory())
+    try store.save(states: ["まとめ": NotificationRuleState(pendingMessageIds: ["m1"])], account: "a@example.com")
+    try store.save(states: ["仕事": NotificationRuleState(pendingMessageIds: ["m2"])], account: "b@example.com")
+
+    try store.remove(account: "a@example.com")
+    try store.remove(account: "a@example.com")
+
+    #expect(try store.load(account: "a@example.com").isEmpty)
     #expect(try store.load(account: "b@example.com")["仕事"]?.pendingMessageIds == ["m2"])
 }

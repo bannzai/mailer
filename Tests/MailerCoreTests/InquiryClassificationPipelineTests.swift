@@ -69,7 +69,7 @@ private func makePipeline(
 
 @Test func pipelineSkipsAPIForStoredMessages() async throws {
     let store = makeInquiryTestStore()
-    try store.save(["m1": makeInquiryClassification(category: "praise")], account: "a@example.com")
+    try store.save(classifications: ["m1": makeInquiryClassification(category: "praise")], account: "a@example.com")
     let transport = makeInquiryTestTransport(jev: jevSuccess)
     let run = await makePipeline(transport: transport, store: store).classify(messages: [metadataMessage(id: "m1")])
 

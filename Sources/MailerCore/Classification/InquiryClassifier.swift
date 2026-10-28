@@ -198,6 +198,7 @@ enum JevQuestion: Encodable {
         case criteria
     }
 
+    /// 種類ごとの criteria の形を保ったまま type / instructions / criteria の 3 キーに書き出す。
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {

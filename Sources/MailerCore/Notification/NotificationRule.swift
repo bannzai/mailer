@@ -88,6 +88,7 @@ public struct NotificationRule: Codable, Sendable, Equatable, Identifiable {
     /// この枠に属するメールをいつ通知するか。
     public var policy: NotificationPolicy
 
+    /// Identifiable 用の識別子。名前をそのまま使う。
     public var id: String { name }
 
     public init(name: String, condition: NotificationRuleCondition, policy: NotificationPolicy) {

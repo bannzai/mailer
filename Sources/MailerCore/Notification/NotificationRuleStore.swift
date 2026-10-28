@@ -47,7 +47,7 @@ public struct NotificationRuleStore: Sendable {
     }
 
     /// 枠定義を並び順のまま書き込む (並び順が評価順になる)。同名の枠があれば投げる。
-    public func save(_ rules: [NotificationRule]) throws {
+    public func save(rules: [NotificationRule]) throws {
         try validateUniqueNames(rules: rules)
         try FileManager.default.createDirectory(
             at: fileURL.deletingLastPathComponent(),
@@ -60,14 +60,14 @@ public struct NotificationRuleStore: Sendable {
     }
 
     /// 枠を追加する。同名の枠があれば置き換える (冪等)。
-    public func add(_ rule: NotificationRule) throws {
+    public func add(rule: NotificationRule) throws {
         var rules = try load()
         if let index = rules.firstIndex(where: { $0.name == rule.name }) {
             rules[index] = rule
         } else {
             rules.append(rule)
         }
-        try save(rules)
+        try save(rules: rules)
     }
 
     /// 枠を削除する。存在しなければ NotificationRuleStoreError.unknownRule を投げる。
@@ -77,7 +77,7 @@ public struct NotificationRuleStore: Sendable {
             throw NotificationRuleStoreError.unknownRule(name)
         }
         rules.remove(at: index)
-        try save(rules)
+        try save(rules: rules)
     }
 }
 
@@ -97,9 +97,22 @@ public struct NotificationStateStore: Sendable {
     }
 
     /// 他アカウントの状態は保持したまま、指定アカウントの状態だけを置き換える。
-    public func save(_ states: [String: NotificationRuleState], account: String) throws {
+    public func save(states: [String: NotificationRuleState], account: String) throws {
+        try write(allAccounts: try loadAllAccounts().merging([account: states]) { _, new in new })
+    }
+
+    /// 指定アカウントの状態を消す (アカウント削除時に呼ぶ。同じアドレスで再追加した時に古い保留と時計が残らないようにする)。
+    /// 記録が無ければ何もしない (冪等)。
+    public func remove(account: String) throws {
         var allAccounts = try loadAllAccounts()
-        allAccounts[account] = states
+        guard allAccounts.removeValue(forKey: account) != nil else {
+            return
+        }
+        try write(allAccounts: allAccounts)
+    }
+
+    /// ファイル全体を書き戻す。
+    private func write(allAccounts: [String: [String: NotificationRuleState]]) throws {
         try FileManager.default.createDirectory(
             at: fileURL.deletingLastPathComponent(),
             withIntermediateDirectories: true

@@ -54,6 +54,7 @@ public struct InquiryRuleDefinition: Codable, Sendable, Equatable {
         self.severity = severity
     }
 
+    /// castle の review-triage.json のキー (snake_case) との対応。
     enum CodingKeys: String, CodingKey {
         case threshold
         case attentionFlags = "attention_flags"

@@ -86,7 +86,7 @@ public struct InquiryClassificationStore: Sendable {
     }
 
     /// 他アカウントの記録は保持したまま、指定アカウントの記録だけを置き換える。
-    public func save(_ classifications: [String: InquiryClassification], account: String) throws {
+    public func save(classifications: [String: InquiryClassification], account: String) throws {
         var allAccounts = try loadAllAccounts()
         allAccounts[account] = classifications
         try FileManager.default.createDirectory(

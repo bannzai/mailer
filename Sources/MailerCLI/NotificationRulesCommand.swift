@@ -87,13 +87,19 @@ struct NotificationRulesCommand: ParsableCommand {
         /// バッチ間隔の上限 (時間)。1 年を超える間隔は通知しない枠と変わらず、巨大値は一覧の時間表記で Int に収まらないため。
         static let maxBatchHours: Double = 24 * 365
 
-        /// 条件を 1 つ以上、ポリシーをちょうど 1 つ指定していることと、バッチ間隔が 0 より大きく上限以下であることを検査する。
+        /// 条件を 1 つ以上、ポリシーをちょうど 1 つ指定していることと、条件の値が空白だけでないこと、
+        /// バッチ間隔が 0 より大きく上限以下であることを検査する。
         func validate() throws {
             guard from != nil || domain != nil || subject != nil || !label.isEmpty || classificationCondition != nil
             else {
                 throw ValidationError(
                     "--from / --domain / --subject / --label / --category / --flag / --severity のいずれか1つ以上を指定してください。"
                 )
+            }
+            // 空のシェル変数が --subject '' のように渡ると、空文字の部分一致で全メールに合致する枠が保存されるため拒否する。
+            let conditionValues = [from, domain, subject].compactMap(\.self) + label + category + flag + severity
+            if conditionValues.contains(where: { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+                throw ValidationError("条件の値に空文字・空白だけの文字列は指定できません。")
             }
             guard [immediate, batchHours != nil, silent].filter(\.self).count == 1 else {
                 throw ValidationError("--immediate / --batch-hours / --silent のいずれか1つを指定してください。")
@@ -108,7 +114,7 @@ struct NotificationRulesCommand: ParsableCommand {
         /// 枠を保存して結果を表示する。
         func run() throws {
             try NotificationRuleStore().add(
-                NotificationRule(
+                rule: NotificationRule(
                     name: name,
                     condition: NotificationRuleCondition(
                         fromAddress: from,
