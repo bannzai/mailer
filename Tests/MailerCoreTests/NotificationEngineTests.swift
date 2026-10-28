@@ -191,6 +191,30 @@ private func makeRule(name: String, domain: String, policy: NotificationPolicy) 
     #expect(decision.deferredMessageIds.isEmpty)
 }
 
+@Test func duplicateRuleNamesShareStateWithoutLosingPendingOrDoubleDelivering() {
+    let rules = [
+        makeRule(name: "重複", domain: "a.com", policy: .batch(interval: twelveHours)),
+        makeRule(name: "重複", domain: "b.com", policy: .batch(interval: twelveHours)),
+    ]
+    let deferred = NotificationEngine.decide(
+        messages: [makeMessage(id: "ma", from: "news@a.com"), makeMessage(id: "mb", from: "news@b.com")],
+        rules: rules,
+        states: ["重複": NotificationRuleState(lastNotifiedAt: now.addingTimeInterval(-3600))],
+        now: now
+    )
+    #expect(deferred.deliveries.isEmpty)
+    #expect(deferred.deferredMessageIds["重複"] == ["ma", "mb"])
+
+    let flushed = NotificationEngine.decide(
+        messages: [],
+        rules: rules,
+        states: deferred.states,
+        now: now.addingTimeInterval(13 * 3600)
+    )
+    #expect(flushed.deliveries == [NotificationDelivery(ruleName: "重複", messageIds: ["ma", "mb"])])
+    #expect(flushed.deferredMessageIds.isEmpty)
+}
+
 @Test func mixedRulesOrderDeliveriesAndKeepUnknownRuleState() {
     let decision = NotificationEngine.decide(
         messages: [

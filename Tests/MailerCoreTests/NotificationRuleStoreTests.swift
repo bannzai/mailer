@@ -41,6 +41,21 @@ private func makeRule(name: String, policy: NotificationPolicy) -> NotificationR
     }
 }
 
+@Test func notificationRuleStoreRejectsDuplicateNames() throws {
+    let directory = makeTestDirectory()
+    let store = NotificationRuleStore(directory: directory)
+    #expect(throws: NotificationRuleStoreError.duplicateRuleName("まとめ")) {
+        try store.save([makeRule(name: "まとめ", policy: .immediate), makeRule(name: "まとめ", policy: .silent)])
+    }
+
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    try JSONEncoder().encode([makeRule(name: "まとめ", policy: .immediate), makeRule(name: "まとめ", policy: .silent)])
+        .write(to: directory.appendingPathComponent("notification-rules.json"))
+    #expect(throws: NotificationRuleStoreError.duplicateRuleName("まとめ")) {
+        try store.load()
+    }
+}
+
 @Test func notificationStateStoreKeepsOtherAccounts() throws {
     let store = NotificationStateStore(directory: makeTestDirectory())
     #expect(try store.load(account: "a@example.com").isEmpty)

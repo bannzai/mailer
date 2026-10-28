@@ -4,11 +4,15 @@ import Foundation
 public enum GmailMessageBodyError: Error, LocalizedError, Equatable {
     /// 本文パートの charset が未知か、そのバイト列を charset で復号できない。
     case undecodableBody(charset: String)
+    /// 本文パートが大きく、Gmail が data ではなく attachmentId を返した。本文の取得に別リクエストが要る。
+    case bodyRequiresAttachmentFetch(attachmentId: String)
 
     public var errorDescription: String? {
         switch self {
         case .undecodableBody(let charset):
             return "本文を charset \(charset) として復号できません"
+        case .bodyRequiresAttachmentFetch(let attachmentId):
+            return "本文が添付 \(attachmentId) として別取得になるため、このメッセージからは本文を取り出せません"
         }
     }
 }
@@ -17,13 +21,14 @@ extension GmailMessage {
     /// 本文をプレーンテキストとして取り出す。text/plain パートを優先し、無ければ text/html のタグを落としたもの、
     /// どちらも無ければ snippet。添付パート (filename 付き・Content-Disposition: attachment) とその配下は本文とみなさない。
     /// 本文パートは Content-Type の charset (無ければ UTF-8) で復号し、復号できなければ投げる (文字化けした本文を分類に回さない)。
+    /// 本文パートが data を持たず attachmentId だけの時も投げる (snippet だけで分類して保存しないため)。
     /// format=full で取得したメッセージでないと payload が無く snippet だけになる。
     public func plainTextBody() throws -> String? {
-        if let textPart = payload?.firstBodyPart(mimeType: "text/plain"), let data = textPart.body?.decodedData {
-            return try textPart.decodeText(data: data)
+        if let textPart = payload?.firstBodyPart(mimeType: "text/plain") {
+            return try textPart.decodeText(data: try textPart.bodyData())
         }
-        if let htmlPart = payload?.firstBodyPart(mimeType: "text/html"), let data = htmlPart.body?.decodedData {
-            return stripHTMLTags(html: try htmlPart.decodeText(data: data))
+        if let htmlPart = payload?.firstBodyPart(mimeType: "text/html") {
+            return stripHTMLTags(html: try htmlPart.decodeText(data: try htmlPart.bodyData()))
         }
         return snippet
     }
@@ -42,11 +47,12 @@ extension GmailMessagePart {
     }
 
     /// firstPart(mimeType:) と同じ深さ優先の探索から、添付パートとその配下を除いたもの。
+    /// 本文が attachmentId で別取得になるパートも本文パートとして返す (snippet へ落とさず bodyData で投げさせるため)。
     func firstBodyPart(mimeType target: String) -> GmailMessagePart? {
         if isAttachment {
             return nil
         }
-        if mimeType == target, body?.data != nil {
+        if mimeType == target, body?.data != nil || body?.attachmentId != nil {
             return self
         }
         for part in parts ?? [] {
@@ -76,6 +82,17 @@ extension GmailMessagePart {
             return pair[1].trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
         }
         return nil
+    }
+
+    /// 本文パートのバイト列。data が無く attachmentId だけの時は GmailMessageBodyError.bodyRequiresAttachmentFetch を投げる。
+    func bodyData() throws -> Data {
+        if let data = body?.decodedData {
+            return data
+        }
+        guard let attachmentId = body?.attachmentId else {
+            return Data()
+        }
+        throw GmailMessageBodyError.bodyRequiresAttachmentFetch(attachmentId: attachmentId)
     }
 
     /// パートのバイト列を charset で復号する。charset が無いパートは UTF-8 (us-ascii の上位互換) として読む。

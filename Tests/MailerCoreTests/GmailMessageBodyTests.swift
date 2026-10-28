@@ -94,6 +94,25 @@ private func makeMessage(subject: String? = nil, snippet: String? = nil, parts: 
     )
 }
 
+@Test func plainTextBodyThrowsWhenBodyIsOnlyAvailableAsAttachment() throws {
+    let message = makeMessage(
+        snippet: "スニペット",
+        parts: [
+            GmailMessagePart(
+                partId: "0",
+                mimeType: "text/plain",
+                filename: nil,
+                headers: nil,
+                body: GmailMessagePartBody(size: 40000, data: nil, attachmentId: "att-1"),
+                parts: nil
+            )
+        ]
+    )
+    #expect(throws: GmailMessageBodyError.bodyRequiresAttachmentFetch(attachmentId: "att-1")) {
+        try message.plainTextBody()
+    }
+}
+
 private func makePart(
     mimeType: String,
     text: String,

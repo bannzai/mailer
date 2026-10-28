@@ -20,6 +20,14 @@ public struct GmailMessagePartBody: Codable, Sendable, Equatable {
     public let size: Int?
     /// base64url エンコードされた本文。
     public let data: String?
+    /// 本文が大きい時に Gmail が data の代わりに返す添付 ID (users.messages.attachments.get で取得する)。
+    public let attachmentId: String?
+
+    public init(size: Int?, data: String?, attachmentId: String? = nil) {
+        self.size = size
+        self.data = data
+        self.attachmentId = attachmentId
+    }
 
     public var decodedData: Data? {
         guard let data else { return nil }

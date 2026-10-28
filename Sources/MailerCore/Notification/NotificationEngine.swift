@@ -88,7 +88,8 @@ public enum NotificationEngine {
         var updatedStates = states
         // 新着が無い枠も評価する。保留中メールの期限到来と、ポリシー変更で取り残された保留を拾うため。
         for (index, rule) in rules.enumerated() {
-            var state = states[rule.name] ?? NotificationRuleState()
+            // 同名の枠が後に続く時に、先の枠が更新した保留・最終通知時刻を引き継ぐ (入力の states から読み直すと上書きで消える)。
+            var state = updatedStates[rule.name] ?? NotificationRuleState()
             let targetMessageIds = merged(
                 pendingMessageIds: state.pendingMessageIds,
                 arrivedMessageIds: arrivedIdsByRuleIndex[index] ?? []

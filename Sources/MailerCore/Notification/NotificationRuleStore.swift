@@ -4,12 +4,24 @@ import Foundation
 public enum NotificationRuleStoreError: Error, LocalizedError, Equatable {
     /// 指定した名前の枠が登録されていない。
     case unknownRule(String)
+    /// 同じ名前の枠が複数ある。状態は名前をキーに持つため、同名の枠は保存も読み込みも受け付けない。
+    case duplicateRuleName(String)
 
     public var errorDescription: String? {
         switch self {
         case .unknownRule(let name):
             return "通知枠 \(name) は登録されていません。"
+        case .duplicateRuleName(let name):
+            return "通知枠 \(name) が複数あります。名前は一意にしてください。"
         }
+    }
+}
+
+/// 同名の枠があれば NotificationRuleStoreError.duplicateRuleName を投げる。
+private func validateUniqueNames(rules: [NotificationRule]) throws {
+    var seenNames: Set<String> = []
+    for rule in rules where !seenNames.insert(rule.name).inserted {
+        throw NotificationRuleStoreError.duplicateRuleName(rule.name)
     }
 }
 
@@ -21,18 +33,21 @@ public struct NotificationRuleStore: Sendable {
         self.fileURL = directory.appendingPathComponent("notification-rules.json")
     }
 
-    /// 枠定義を並び順のまま読み込む。ファイルが無ければ空。
+    /// 枠定義を並び順のまま読み込む。ファイルが無ければ空。手で編集して同名の枠が入ったファイルは投げる。
     public func load() throws -> [NotificationRule] {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             return []
         }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([NotificationRule].self, from: Data(contentsOf: fileURL))
+        let rules = try decoder.decode([NotificationRule].self, from: Data(contentsOf: fileURL))
+        try validateUniqueNames(rules: rules)
+        return rules
     }
 
-    /// 枠定義を並び順のまま書き込む (並び順が評価順になる)。
+    /// 枠定義を並び順のまま書き込む (並び順が評価順になる)。同名の枠があれば投げる。
     public func save(_ rules: [NotificationRule]) throws {
+        try validateUniqueNames(rules: rules)
         try FileManager.default.createDirectory(
             at: fileURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
