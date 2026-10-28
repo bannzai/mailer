@@ -101,6 +101,6 @@ func makeGmailClient(transport: MockTransport) -> GmailClient {
 }
 
 /// transport が受けたリクエストのうち Jev API 宛てのものだけを返す。
-func jevTestRequests(_ transport: MockTransport) -> [URLRequest] {
+func jevTestRequests(transport: MockTransport) -> [URLRequest] {
     transport.requests.filter { $0.url?.host == "api.typesafe.ai" }
 }

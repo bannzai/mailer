@@ -56,8 +56,9 @@ struct ClassifyCommand: AsyncParsableCommand {
         let rules = try NotificationRuleStore().load()
         for message in messages {
             let classification = run.classifications[message.id]
-            let ruleName = rules.firstMatching(message: message, classification: classification)?.name ?? "枠なし"
-            print("\(message.summaryLine)  \(classificationSummary(classification: classification))  枠=\(ruleName)")
+            print(
+                "\(message.summaryLine)  \(classificationSummary(classification: classification))  枠=\(rules.firstMatching(message: message, classification: classification)?.name ?? "枠なし")"
+            )
         }
         print(
             "判定: 新規 \(run.classifiedMessageIds.count) 件 / 保存済み \(run.classifications.count - run.classifiedMessageIds.count) 件 / 判定なし \(run.unavailableMessageIds.count) 件"
@@ -73,7 +74,6 @@ private func classificationSummary(classification: InquiryClassification?) -> St
     guard let classification else {
         return "分類なし"
     }
-    let flags = classification.adoptedFlags.isEmpty ? "-" : classification.adoptedFlags.joined(separator: ",")
     return
-        "\(classification.category) (\(classification.categoryConfidence))  \(classification.severity) (\(classification.severityConfidence))  flags=\(flags)"
+        "\(classification.category) (\(classification.categoryConfidence))  \(classification.severity) (\(classification.severityConfidence))  flags=\(classification.adoptedFlags.isEmpty ? "-" : classification.adoptedFlags.joined(separator: ","))"
 }

@@ -62,7 +62,7 @@ private func makePipeline(
     let gmailRequests = gmailTestRequests(transport)
     #expect(gmailRequests.count == 1)
     #expect(gmailRequests[0].url?.query?.contains("format=full") == true)
-    let jevBody = try #require(jevTestRequests(transport).first?.httpBody)
+    let jevBody = try #require(jevTestRequests(transport: transport).first?.httpBody)
     let sent = try #require(JSONSerialization.jsonObject(with: jevBody) as? NSDictionary)
     #expect((sent["state"] as? NSDictionary)?["review"] as? String == "件名: 起動しない\n\n落ちます")
 }
@@ -92,7 +92,7 @@ private func makePipeline(
     #expect(run.unavailableReason == InquiryClassifierError.httpStatus(500).localizedDescription)
     #expect(try store.load(account: "a@example.com").isEmpty)
     // 1 度失敗したら残りは API を呼ばない (不達時にメール件数分は待たない)
-    #expect(jevTestRequests(transport).count == 1)
+    #expect(jevTestRequests(transport: transport).count == 1)
     #expect(gmailTestRequests(transport).count == 1)
 }
 
@@ -112,7 +112,7 @@ private func makePipeline(
     #expect(run.unavailableReason == GmailMessageBodyError.undecodableBody(charset: "x-nope").localizedDescription)
     #expect(run.classifiedMessageIds == ["m2"])
     #expect(try store.load(account: "a@example.com").keys.sorted() == ["m2"])
-    #expect(jevTestRequests(transport).count == 1)
+    #expect(jevTestRequests(transport: transport).count == 1)
 }
 
 @Test func pipelineTreatsTimeoutAsUnavailable() async throws {

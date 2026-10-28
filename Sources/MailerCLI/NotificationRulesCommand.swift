@@ -2,6 +2,7 @@ import ArgumentParser
 import Foundation
 import MailerCore
 
+/// 通知枠 (フィルタルール) を CLI から管理する。枠定義は NotificationRuleStore の notification-rules.json に保存する。
 struct NotificationRulesCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "notification-rules",
@@ -10,6 +11,7 @@ struct NotificationRulesCommand: ParsableCommand {
         defaultSubcommand: List.self
     )
 
+    /// 登録済みの通知枠を評価順 (保存した並び) に 1 行ずつ表示する。
     struct List: ParsableCommand {
         static let configuration = CommandConfiguration(commandName: "list", abstract: "登録済みの通知枠を一覧する")
 
@@ -31,42 +33,53 @@ struct NotificationRulesCommand: ParsableCommand {
     struct Add: ParsableCommand {
         static let configuration = CommandConfiguration(commandName: "add", abstract: "通知枠を追加する (同名なら置き換え)")
 
+        /// 枠の名前 (識別子)。
         @Argument(help: "通知枠の名前 (識別子)")
         var name: String
 
+        /// 条件: 差出人アドレスの完全一致。
         @Option(name: .long, help: "差出人アドレスを条件にする (例: news@example.com)")
         var from: String?
 
+        /// 条件: 差出人ドメインの完全一致。
         @Option(name: .long, help: "差出人ドメインを条件にする (例: example.com)")
         var domain: String?
 
+        /// 条件: 件名の部分一致。
         @Option(name: .long, help: "件名に含まれる文字列を条件にする")
         var subject: String?
 
+        /// 条件: すべて持っている必要があるラベル ID。
         @Option(name: .long, help: "メールが持っている必要があるラベル ID (複数指定可)")
         var label: [String] = []
 
+        /// 条件: Jev の判定の種別 (いずれかに当たれば合致)。
         @Option(
             name: .long,
             help: "Jev の判定の種別を条件にする (複数指定可。bug / billing 等、質問定義 review-triage.json の category の名前)"
         )
         var category: [String] = []
 
+        /// 条件: Jev の判定の flag (いずれかが採用帯なら合致)。
         @Option(
             name: .long,
             help: "Jev の判定の flag を条件にする (複数指定可。unusable_now / refund_request 等、質問定義の flags の名前)"
         )
         var flag: [String] = []
 
+        /// 条件: Jev の判定の深刻度の段階名 (いずれかに当たれば合致)。
         @Option(name: .long, help: "Jev の判定の深刻度を条件にする (複数指定可。none / low / medium / high)")
         var severity: [String] = []
 
+        /// ポリシー: 新着のたびに通知する。
         @Flag(name: .long, help: "新着のたびに通知する")
         var immediate = false
 
+        /// ポリシー: 指定した時間ごとにまとめて通知する。
         @Option(name: .long, help: "指定した時間ごとにまとめて通知する")
         var batchHours: Double?
 
+        /// ポリシー: 通知しない。
         @Flag(name: .long, help: "通知しない")
         var silent = false
 
@@ -114,6 +127,7 @@ struct NotificationRulesCommand: ParsableCommand {
             )
         }
 
+        /// --immediate / --batch-hours / --silent から決まる通知ポリシー (validate でちょうど 1 つを保証済み)。
         private var policy: NotificationPolicy {
             if let batchHours {
                 return .batch(interval: batchHours * 3600)
@@ -122,9 +136,11 @@ struct NotificationRulesCommand: ParsableCommand {
         }
     }
 
+    /// 名前で指定した通知枠を削除する。無ければエラー。
     struct Remove: ParsableCommand {
         static let configuration = CommandConfiguration(commandName: "remove", abstract: "通知枠を削除する")
 
+        /// 削除する枠の名前。
         @Argument(help: "削除する通知枠の名前")
         var name: String
 

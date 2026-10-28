@@ -32,9 +32,11 @@ public struct InquiryClassificationPipeline: Sendable {
     /// より十分小さく、1 件の入力を 3,000 トークン前後 ($0.00013 未満) に抑える。
     public static let maxInputCharacters = 2000
 
+    /// 未判定のメールの本文を format=full で取り直すための Gmail クライアント (保存先のアカウントもここから取る)。
     let gmail: GmailClient
     /// nil なら API キーか質問定義が無い環境 (iOS 等)。全メールを判定なしとして返す。
     let classifier: InquiryClassifier?
+    /// 判定結果の保存先。保存済みのメールは API を呼ばない。
     let store: InquiryClassificationStore
 
     public init(gmail: GmailClient, classifier: InquiryClassifier?, store: InquiryClassificationStore) {

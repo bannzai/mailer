@@ -9,7 +9,8 @@ private func makeClassifier(transport: MockTransport, rules: InquiryRuleDefiniti
     InquiryClassifier(apiKey: "test-key", rules: rules, transport: transport, retryDelays: [0, 0], timeout: 1)
 }
 
-private func jsonObject(_ data: Data) throws -> NSDictionary {
+/// JSON のバイト列を、キー順に依存しない比較のために NSDictionary にする。
+private func jsonObject(data: Data) throws -> NSDictionary {
     try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
 }
 
@@ -57,7 +58,7 @@ private func jsonObject(_ data: Data) throws -> NSDictionary {
             ],
         ],
     ]
-    #expect(try jsonObject(body) == expected)
+    #expect(try jsonObject(data: body) == expected)
 }
 
 /// castle の classify-review.sh --dry-run の出力 (環境変数 MAILER_JEV_DRY_RUN_FIXTURE のファイル) と、
@@ -70,12 +71,12 @@ private func jsonObject(_ data: Data) throws -> NSDictionary {
 )
 func requestBodyEqualsCastleDryRunOutput() throws {
     let fixtureURL = URL(fileURLWithPath: ProcessInfo.processInfo.environment["MAILER_JEV_DRY_RUN_FIXTURE"]!)
-    let fixture = try jsonObject(Data(contentsOf: fixtureURL))
+    let fixture = try jsonObject(data: Data(contentsOf: fixtureURL))
     let text = try #require((fixture["state"] as? NSDictionary)?["review"] as? String)
     let rules = try #require(try InquiryRuleDefinition.load())
     let body = try makeClassifier(transport: MockTransport { _ in throw URLError(.cancelled) }, rules: rules)
         .requestBody(text: text)
-    #expect(try jsonObject(body) == fixture)
+    #expect(try jsonObject(data: body) == fixture)
 }
 
 @Test func classifySendsBearerTokenAndParsesRealResponseShape() async throws {

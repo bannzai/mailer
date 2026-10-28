@@ -3,11 +3,13 @@ import Testing
 
 @testable import MailerCore
 
-private func base64url(_ text: String) -> String {
-    base64url(Data(text.utf8))
+/// 文字列を UTF-8 のバイト列として Gmail の body.data と同じ base64url にする。
+private func base64url(text: String) -> String {
+    base64url(data: Data(text.utf8))
 }
 
-private func base64url(_ data: Data) -> String {
+/// バイト列を Gmail の body.data と同じ base64url (パディング無し) にする。
+private func base64url(data: Data) -> String {
     data.base64EncodedString()
         .replacingOccurrences(of: "+", with: "-")
         .replacingOccurrences(of: "/", with: "_")
@@ -21,7 +23,7 @@ private func makeEncodedPart(mimeType: String, bytes: Data, charset: String) -> 
         mimeType: mimeType,
         filename: nil,
         headers: [GmailHeader(name: "Content-Type", value: "\(mimeType); charset=\"\(charset)\"")],
-        body: GmailMessagePartBody(size: bytes.count, data: base64url(bytes)),
+        body: GmailMessagePartBody(size: bytes.count, data: base64url(data: bytes)),
         parts: nil
     )
 }
@@ -44,7 +46,7 @@ private func makeEncodedPart(mimeType: String, bytes: Data, charset: String) -> 
         mimeType: "text/plain",
         filename: nil,
         headers: [GmailHeader(name: "content-type", value: "text/plain; format=flowed; Charset = 'ISO-2022-JP' ; x=1")],
-        body: GmailMessagePartBody(size: iso2022.count, data: base64url(iso2022)),
+        body: GmailMessagePartBody(size: iso2022.count, data: base64url(data: iso2022)),
         parts: nil
     )
     #expect(part.charset == "ISO-2022-JP")
@@ -124,7 +126,7 @@ private func makePart(
         mimeType: mimeType,
         filename: filename,
         headers: headers,
-        body: GmailMessagePartBody(size: text.utf8.count, data: base64url(text)),
+        body: GmailMessagePartBody(size: text.utf8.count, data: base64url(text: text)),
         parts: nil
     )
 }

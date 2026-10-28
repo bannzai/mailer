@@ -72,6 +72,7 @@ public enum InquiryClassificationBand: Sendable, Equatable {
 /// 判定結果を classifications.json にアカウント別・メール ID 別に永続化する。
 /// メール ID は Gmail アカウントごとに独立しているためアカウント単位で持つ。
 public struct InquiryClassificationStore: Sendable {
+    /// 保存先の classifications.json。
     let fileURL: URL
 
     public init(directory: URL = MailerPaths.configDirectory) {

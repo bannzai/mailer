@@ -132,6 +132,7 @@ public struct InquiryClassificationCondition: Codable, Sendable, Equatable {
         {
             return true
         }
+        // 判定結果に無い flag (質問定義に無い名前を条件に書いた時) は却下帯の 0 として扱い、合致させない。
         if let flags,
             flags.contains(where: { InquiryClassificationBand(probability: classification.flags[$0] ?? 0) == .adopted })
         {

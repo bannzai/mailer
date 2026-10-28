@@ -59,12 +59,16 @@ public struct InquiryClassifier: Sendable {
     /// 受信処理でメール件数分を直列に待つため、通常応答の 20 倍以上を確保しつつ 60 秒より短くする。
     public static let defaultTimeout: TimeInterval = 20
 
+    /// TypeSafe の API キー (Authorization: Bearer に載せる)。
     let apiKey: String
+    /// Jev に投げる質問定義 (種別の選択肢・flag・深刻度の段階)。
     let rules: InquiryRuleDefinition
+    /// HTTP の送信経路。テストでは MockTransport を注入する。
     let transport: HTTPTransport
     /// HTTP 429 (rate limit) / 529 (overloaded) の再試行の待機秒数。要素数が最大再試行回数になる。
     /// 公式ドキュメントの指数バックオフ (2 秒・4 秒。https://docs.typesafe.ai/api.md「Handling rate limits」) に合わせる。テストでは 0 を注入する。
     let retryDelays: [TimeInterval]
+    /// 1 リクエストの最大待ち時間 (秒)。
     let timeout: TimeInterval
 
     public init(
