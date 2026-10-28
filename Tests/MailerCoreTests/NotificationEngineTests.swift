@@ -1,0 +1,309 @@
+import Foundation
+import Testing
+
+@testable import MailerCore
+
+private let now = Date(timeIntervalSince1970: 1_700_000_000)
+/// バッチ枠のテストで使う間隔 (12 時間)。
+private let twelveHours: TimeInterval = 43200
+
+private func makeMessage(id: String, from: String) -> GmailMessage {
+    GmailMessage(
+        id: id,
+        threadId: nil,
+        labelIds: nil,
+        snippet: nil,
+        historyId: nil,
+        internalDate: nil,
+        payload: GmailMessagePart(
+            partId: nil,
+            mimeType: nil,
+            filename: nil,
+            headers: [GmailHeader(name: "From", value: from)],
+            body: nil,
+            parts: nil
+        ),
+        sizeEstimate: nil
+    )
+}
+
+private func makeRule(name: String, domain: String, policy: NotificationPolicy) -> NotificationRule {
+    NotificationRule(name: name, condition: NotificationRuleCondition(fromDomain: domain), policy: policy)
+}
+
+@Test func unmatchedMessagesAreNotifiedImmediately() {
+    let decision = NotificationEngine.decide(
+        messages: [makeMessage(id: "m1", from: "a@example.com"), makeMessage(id: "m2", from: "b@other.com")],
+        rules: [],
+        states: [:],
+        now: now
+    )
+    #expect(decision.deliveries == [NotificationDelivery(ruleName: nil, messageIds: ["m1", "m2"])])
+    #expect(decision.states.isEmpty)
+    #expect(decision.immediateMessageIds == ["m1", "m2"])
+    #expect(decision.deferredMessageIds.isEmpty)
+}
+
+@Test func immediateRuleNotifiesArrivedMessages() {
+    let decision = NotificationEngine.decide(
+        messages: [makeMessage(id: "m1", from: "boss@example.com")],
+        rules: [makeRule(name: "仕事", domain: "example.com", policy: .immediate)],
+        states: [:],
+        now: now
+    )
+    #expect(decision.deliveries == [NotificationDelivery(ruleName: "仕事", messageIds: ["m1"])])
+    #expect(decision.states["仕事"]?.lastNotifiedAt == now)
+    #expect(decision.states["仕事"]?.pendingMessageIds.isEmpty == true)
+    #expect(decision.deferredMessageIds.isEmpty)
+}
+
+@Test func immediateRuleFlushesPendingLeftByPolicyChange() {
+    let decision = NotificationEngine.decide(
+        messages: [],
+        rules: [makeRule(name: "仕事", domain: "example.com", policy: .immediate)],
+        states: ["仕事": NotificationRuleState(pendingMessageIds: ["p1"])],
+        now: now
+    )
+    #expect(decision.deliveries == [NotificationDelivery(ruleName: "仕事", messageIds: ["p1"])])
+    #expect(decision.states["仕事"]?.pendingMessageIds.isEmpty == true)
+    #expect(decision.states["仕事"]?.lastNotifiedAt == now)
+}
+
+@Test func immediateRuleDeliversPendingBeforeArrivals() {
+    let decision = NotificationEngine.decide(
+        messages: [makeMessage(id: "m1", from: "boss@example.com")],
+        rules: [makeRule(name: "仕事", domain: "example.com", policy: .immediate)],
+        states: ["仕事": NotificationRuleState(pendingMessageIds: ["p1"])],
+        now: now
+    )
+    #expect(decision.deliveries == [NotificationDelivery(ruleName: "仕事", messageIds: ["p1", "m1"])])
+    #expect(decision.deferredMessageIds.isEmpty)
+}
+
+@Test func batchRuleNotifiesFirstArrivalImmediately() {
+    let decision = NotificationEngine.decide(
+        messages: [makeMessage(id: "m1", from: "news@example.com")],
+        rules: [makeRule(name: "まとめ", domain: "example.com", policy: .batch(interval: twelveHours))],
+        states: [:],
+        now: now
+    )
+    #expect(decision.deliveries == [NotificationDelivery(ruleName: "まとめ", messageIds: ["m1"])])
+    #expect(decision.states["まとめ"]?.lastNotifiedAt == now)
+    #expect(decision.states["まとめ"]?.pendingMessageIds.isEmpty == true)
+}
+
+@Test func batchRuleDefersWithinInterval() {
+    let decision = NotificationEngine.decide(
+        messages: [makeMessage(id: "m1", from: "news@example.com")],
+        rules: [makeRule(name: "まとめ", domain: "example.com", policy: .batch(interval: twelveHours))],
+        states: ["まとめ": NotificationRuleState(lastNotifiedAt: now.addingTimeInterval(-3600))],
+        now: now
+    )
+    #expect(decision.deliveries.isEmpty)
+    #expect(decision.deferredMessageIds["まとめ"] == ["m1"])
+    #expect(decision.states["まとめ"]?.lastNotifiedAt == now.addingTimeInterval(-3600))
+}
+
+@Test func batchRuleAccumulatesPendingWithoutDuplicates() {
+    let decision = NotificationEngine.decide(
+        messages: [makeMessage(id: "p1", from: "news@example.com"), makeMessage(id: "m1", from: "news@example.com")],
+        rules: [makeRule(name: "まとめ", domain: "example.com", policy: .batch(interval: twelveHours))],
+        states: [
+            "まとめ": NotificationRuleState(lastNotifiedAt: now.addingTimeInterval(-3600), pendingMessageIds: ["p1"])
+        ],
+        now: now
+    )
+    #expect(decision.deliveries.isEmpty)
+    #expect(decision.deferredMessageIds["まとめ"] == ["p1", "m1"])
+}
+
+@Test func batchRuleFlushesPendingWhenIntervalElapsed() {
+    let decision = NotificationEngine.decide(
+        messages: [makeMessage(id: "m1", from: "news@example.com")],
+        rules: [makeRule(name: "まとめ", domain: "example.com", policy: .batch(interval: twelveHours))],
+        states: [
+            "まとめ": NotificationRuleState(
+                lastNotifiedAt: now.addingTimeInterval(-13 * 3600),
+                pendingMessageIds: ["p1"]
+            )
+        ],
+        now: now
+    )
+    #expect(decision.deliveries == [NotificationDelivery(ruleName: "まとめ", messageIds: ["p1", "m1"])])
+    #expect(decision.states["まとめ"]?.pendingMessageIds.isEmpty == true)
+    #expect(decision.states["まとめ"]?.lastNotifiedAt == now)
+}
+
+@Test func batchRuleFlushesPendingWithoutNewMessages() {
+    let decision = NotificationEngine.decide(
+        messages: [],
+        rules: [makeRule(name: "まとめ", domain: "example.com", policy: .batch(interval: twelveHours))],
+        states: [
+            "まとめ": NotificationRuleState(
+                lastNotifiedAt: now.addingTimeInterval(-13 * 3600),
+                pendingMessageIds: ["p1"]
+            )
+        ],
+        now: now
+    )
+    #expect(decision.deliveries == [NotificationDelivery(ruleName: "まとめ", messageIds: ["p1"])])
+    #expect(decision.deferredMessageIds.isEmpty)
+}
+
+@Test func silentRuleNeitherNotifiesNorDefers() {
+    let decision = NotificationEngine.decide(
+        messages: [makeMessage(id: "m1", from: "ad@example.com")],
+        rules: [makeRule(name: "無音", domain: "example.com", policy: .silent)],
+        states: [:],
+        now: now
+    )
+    #expect(decision.deliveries.isEmpty)
+    #expect(decision.immediateMessageIds.isEmpty)
+    #expect(decision.deferredMessageIds.isEmpty)
+    #expect(decision.states["無音"]?.pendingMessageIds ?? [] == [])
+    #expect(decision.states["無音"]?.lastNotifiedAt == nil)
+}
+
+@Test func silentRuleClearsPendingLeftByPolicyChange() {
+    let decision = NotificationEngine.decide(
+        messages: [],
+        rules: [makeRule(name: "無音", domain: "example.com", policy: .silent)],
+        states: ["無音": NotificationRuleState(pendingMessageIds: ["p1"])],
+        now: now
+    )
+    #expect(decision.deliveries.isEmpty)
+    #expect(decision.deferredMessageIds.isEmpty)
+    #expect(decision.states["無音"]?.pendingMessageIds == [])
+}
+
+@Test func duplicateRuleNamesKeepFirstMatchWins() {
+    let decision = NotificationEngine.decide(
+        messages: [makeMessage(id: "ma", from: "news@a.com"), makeMessage(id: "mb", from: "news@b.com")],
+        rules: [
+            makeRule(name: "重複", domain: "a.com", policy: .silent),
+            makeRule(name: "重複", domain: "b.com", policy: .immediate),
+        ],
+        states: [:],
+        now: now
+    )
+    #expect(decision.deliveries == [NotificationDelivery(ruleName: "重複", messageIds: ["mb"])])
+    #expect(decision.immediateMessageIds == ["mb"])
+    #expect(decision.deferredMessageIds.isEmpty)
+}
+
+@Test func duplicateRuleNamesShareStateWithoutLosingPendingOrDoubleDelivering() {
+    let rules = [
+        makeRule(name: "重複", domain: "a.com", policy: .batch(interval: twelveHours)),
+        makeRule(name: "重複", domain: "b.com", policy: .batch(interval: twelveHours)),
+    ]
+    let deferred = NotificationEngine.decide(
+        messages: [makeMessage(id: "ma", from: "news@a.com"), makeMessage(id: "mb", from: "news@b.com")],
+        rules: rules,
+        states: ["重複": NotificationRuleState(lastNotifiedAt: now.addingTimeInterval(-3600))],
+        now: now
+    )
+    #expect(deferred.deliveries.isEmpty)
+    #expect(deferred.deferredMessageIds["重複"] == ["ma", "mb"])
+
+    let flushed = NotificationEngine.decide(
+        messages: [],
+        rules: rules,
+        states: deferred.states,
+        now: now.addingTimeInterval(13 * 3600)
+    )
+    #expect(flushed.deliveries == [NotificationDelivery(ruleName: "重複", messageIds: ["ma", "mb"])])
+    #expect(flushed.deferredMessageIds.isEmpty)
+}
+
+@Test func mixedRulesOrderDeliveriesAndKeepUnknownRuleState() {
+    let decision = NotificationEngine.decide(
+        messages: [
+            makeMessage(id: "m1", from: "news@batch.example.com"),
+            makeMessage(id: "m2", from: "boss@work.example.com"),
+            makeMessage(id: "m3", from: "someone@other.com"),
+        ],
+        rules: [
+            makeRule(name: "仕事", domain: "work.example.com", policy: .immediate),
+            makeRule(name: "まとめ", domain: "batch.example.com", policy: .batch(interval: twelveHours)),
+        ],
+        states: [
+            "まとめ": NotificationRuleState(lastNotifiedAt: now.addingTimeInterval(-3600)),
+            "削除済みの枠": NotificationRuleState(lastNotifiedAt: now.addingTimeInterval(-7200), pendingMessageIds: ["x1"]),
+        ],
+        now: now
+    )
+    #expect(
+        decision.deliveries == [
+            NotificationDelivery(ruleName: "仕事", messageIds: ["m2"]),
+            NotificationDelivery(ruleName: nil, messageIds: ["m3"]),
+        ]
+    )
+    #expect(decision.deferredMessageIds["まとめ"] == ["m1"])
+    #expect(decision.states["削除済みの枠"]?.pendingMessageIds == ["x1"])
+}
+
+/// issue #28 の例: 深刻度 high または unusable_now / refund_request が採用帯のメールは即時通知、それ以外の問い合わせは 12 時間ごとにまとめる。
+@Test func decideRoutesByClassificationAndFallsBackWithoutIt() {
+    let rules = [
+        NotificationRule(
+            name: "緊急",
+            condition: NotificationRuleCondition(
+                classification: InquiryClassificationCondition(
+                    flags: ["unusable_now", "refund_request"], severities: ["high"])
+            ),
+            policy: .immediate
+        ),
+        NotificationRule(
+            name: "問い合わせまとめ",
+            condition: NotificationRuleCondition(fromDomain: "example.com"),
+            policy: .batch(interval: twelveHours)
+        ),
+    ]
+    let decision = NotificationEngine.decide(
+        messages: [
+            makeMessage(id: "urgent", from: "a@example.com"),
+            makeMessage(id: "uncertain", from: "b@example.com"),
+            makeMessage(id: "calm", from: "c@example.com"),
+            makeMessage(id: "unclassified", from: "d@example.com"),
+        ],
+        rules: rules,
+        states: ["問い合わせまとめ": NotificationRuleState(lastNotifiedAt: now.addingTimeInterval(-3600))],
+        now: now,
+        classifications: [
+            "urgent": makeInquiryClassification(),
+            "uncertain": makeInquiryClassification(
+                severity: "high",
+                severityConfidence: 0.5,
+                flags: ["unusable_now": 0.6, "refund_request": 0.4]
+            ),
+            "calm": makeInquiryClassification(
+                category: "praise",
+                severity: "none",
+                severityConfidence: 0.95,
+                flags: ["unusable_now": 0.01, "refund_request": 0.02]
+            ),
+        ]
+    )
+    #expect(decision.deliveries == [NotificationDelivery(ruleName: "緊急", messageIds: ["urgent"])])
+    #expect(decision.deferredMessageIds == ["問い合わせまとめ": ["uncertain", "calm", "unclassified"]])
+}
+
+@Test func decideSplitsArrivalsIntoImmediateAndDeferred() {
+    let decision = NotificationEngine.decide(
+        messages: [
+            makeMessage(id: "m1", from: "boss@work.example.com"),
+            makeMessage(id: "m2", from: "news@batch.example.com"),
+            makeMessage(id: "m3", from: "ad@silent.example.com"),
+            makeMessage(id: "m4", from: "friend@other.com"),
+        ],
+        rules: [
+            makeRule(name: "仕事", domain: "work.example.com", policy: .immediate),
+            makeRule(name: "まとめ", domain: "batch.example.com", policy: .batch(interval: twelveHours)),
+            makeRule(name: "無音", domain: "silent.example.com", policy: .silent),
+        ],
+        states: ["まとめ": NotificationRuleState(lastNotifiedAt: now.addingTimeInterval(-3600))],
+        now: now
+    )
+    #expect(decision.immediateMessageIds == ["m1", "m4"])
+    #expect(decision.deferredMessageIds == ["まとめ": ["m2"]])
+}

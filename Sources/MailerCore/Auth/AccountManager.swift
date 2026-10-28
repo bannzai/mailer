@@ -6,17 +6,21 @@ public struct AccountManager: Sendable {
     let transport: HTTPTransport
     let tokenStore: TokenStore
     let accountStore: AccountStore
+    /// アカウント削除時に、そのアカウントの通知状態 (保留中メール・最終通知時刻) も消すための保存先。
+    let notificationStateStore: NotificationStateStore
 
     public init(
         configuration: OAuthConfiguration,
         transport: HTTPTransport = URLSessionTransport(),
         tokenStore: TokenStore = KeychainTokenStore(),
-        accountStore: AccountStore = AccountStore()
+        accountStore: AccountStore = AccountStore(),
+        notificationStateStore: NotificationStateStore = NotificationStateStore()
     ) {
         self.configuration = configuration
         self.transport = transport
         self.tokenStore = tokenStore
         self.accountStore = accountStore
+        self.notificationStateStore = notificationStateStore
     }
 
     public var oauthClient: GoogleOAuthClient {
@@ -66,12 +70,14 @@ public struct AccountManager: Sendable {
     }
 
     /// アカウントを削除する。トークンの失効に失敗してもローカルの削除は続行する (冪等)。
+    /// 通知状態 (保留中メール・最終通知時刻) も消し、同じアドレスで再追加した時に古い状態が残らないようにする。
     public func removeAccount(email: String) async throws {
         if let token = try? tokenStore.load(for: email) {
             try? await oauthClient.revoke(token: token.refreshToken)
         }
         try tokenStore.delete(for: email)
         try accountStore.remove(email: email)
+        try notificationStateStore.remove(account: email)
     }
 
     public func accounts() throws -> AccountList {
