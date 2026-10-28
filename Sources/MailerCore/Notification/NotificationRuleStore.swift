@@ -27,6 +27,7 @@ private func validateUniqueNames(rules: [NotificationRule]) throws {
 
 /// 枠定義を notification-rules.json に永続化する。CLI とアプリで共有する。
 public struct NotificationRuleStore: Sendable {
+    /// 保存先の notification-rules.json。
     let fileURL: URL
 
     public init(directory: URL = MailerPaths.configDirectory) {
@@ -83,6 +84,7 @@ public struct NotificationRuleStore: Sendable {
 /// 枠ごとの通知状態を notification-state.json にアカウント別に永続化する。
 /// メール ID は Gmail アカウントごとに独立しているためアカウント単位で持つ。
 public struct NotificationStateStore: Sendable {
+    /// 保存先の notification-state.json。
     let fileURL: URL
 
     public init(directory: URL = MailerPaths.configDirectory) {

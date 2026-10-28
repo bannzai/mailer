@@ -58,6 +58,7 @@ public enum InquiryClassificationBand: Sendable, Equatable {
     /// 却下とみなす確率の上限。adoptedThreshold と同じ出典。
     public static let rejectedThreshold = 0.3
 
+    /// 確率 (0〜1) を閾値で 3 帯に分ける。
     public init(probability: Double) {
         if probability >= Self.adoptedThreshold {
             self = .adopted

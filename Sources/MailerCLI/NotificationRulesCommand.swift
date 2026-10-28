@@ -15,6 +15,7 @@ struct NotificationRulesCommand: ParsableCommand {
     struct List: ParsableCommand {
         static let configuration = CommandConfiguration(commandName: "list", abstract: "登録済みの通知枠を一覧する")
 
+        /// 枠を読み込んで 1 行ずつ表示する。無ければ追加方法を案内する。
         func run() throws {
             let rules = try NotificationRuleStore().load()
             guard !rules.isEmpty else {
@@ -83,6 +84,10 @@ struct NotificationRulesCommand: ParsableCommand {
         @Flag(name: .long, help: "通知しない")
         var silent = false
 
+        /// バッチ間隔の上限 (時間)。1 年を超える間隔は通知しない枠と変わらず、巨大値は一覧の時間表記で Int に収まらないため。
+        static let maxBatchHours: Double = 24 * 365
+
+        /// 条件を 1 つ以上、ポリシーをちょうど 1 つ指定していることと、バッチ間隔が 0 より大きく上限以下であることを検査する。
         func validate() throws {
             guard from != nil || domain != nil || subject != nil || !label.isEmpty || classificationCondition != nil
             else {
@@ -93,11 +98,14 @@ struct NotificationRulesCommand: ParsableCommand {
             guard [immediate, batchHours != nil, silent].filter(\.self).count == 1 else {
                 throw ValidationError("--immediate / --batch-hours / --silent のいずれか1つを指定してください。")
             }
-            if let batchHours, batchHours <= 0 {
-                throw ValidationError("--batch-hours には 0 より大きい値を指定してください。")
+            if let batchHours, !(batchHours > 0 && batchHours <= Self.maxBatchHours) {
+                throw ValidationError(
+                    "--batch-hours には 0 より大きく \(Int(Self.maxBatchHours)) 以下の値を指定してください。"
+                )
             }
         }
 
+        /// 枠を保存して結果を表示する。
         func run() throws {
             try NotificationRuleStore().add(
                 NotificationRule(
@@ -144,6 +152,7 @@ struct NotificationRulesCommand: ParsableCommand {
         @Argument(help: "削除する通知枠の名前")
         var name: String
 
+        /// 枠を削除して結果を表示する。
         func run() throws {
             try NotificationRuleStore().remove(name: name)
             print("通知枠「\(name)」を削除しました。")
@@ -178,7 +187,7 @@ private func policySummary(policy: NotificationPolicy) -> String {
 }
 
 /// バッチ間隔を時間表記にする。整数時間なら小数点を出さない。
+/// 手で編集したファイルの巨大値でも落ちないよう Int に変換せず、%g (有効 6 桁) で表記する。
 private func batchHoursText(interval: TimeInterval) -> String {
-    let hours = interval / 3600
-    return hours == hours.rounded() ? String(Int(hours)) : String(hours)
+    String(format: "%g", interval / 3600)
 }

@@ -71,6 +71,7 @@ public struct InquiryClassifier: Sendable {
     /// 1 リクエストの最大待ち時間 (秒)。
     let timeout: TimeInterval
 
+    /// retryDelays と timeout の既定値は上の定数の根拠に従う。テストでは 0 と短い timeout を注入する。
     public init(
         apiKey: String,
         rules: InquiryRuleDefinition,
@@ -136,6 +137,8 @@ public struct InquiryClassifier: Sendable {
         return try encoder.encode(JevRequest(state: ["review": text], questions: questions, model: Self.model))
     }
 
+    /// 応答の JSON を判定結果にする。category / severity / 質問定義にある全 flag の回答が無ければ missingAnswer、
+    /// 深刻度のスコアを丸めた添字が levels の範囲外なら severityOutOfRange を投げる。classifiedAt には now を入れる。
     static func parse(data: Data, rules: InquiryRuleDefinition, now: Date) throws -> InquiryClassification {
         let response = try JSONDecoder().decode(JevResponse.self, from: data)
         guard let category = response.answers["category"], let choice = category.choice,
@@ -174,8 +177,11 @@ public struct InquiryClassifier: Sendable {
 
 /// POST /v1/systemone のリクエスト本体。
 struct JevRequest: Encodable {
+    /// 判定対象のテキスト (キー review に本文を入れる。質問の instructions が `review` を参照する)。
     let state: [String: String]
+    /// 質問名 -> 質問定義。
     let questions: [String: JevQuestion]
+    /// 判定モデル ID。
     let model: String
 }
 
@@ -185,6 +191,7 @@ enum JevQuestion: Encodable {
     case noul(instructions: String, criteria: [String: String])
     case score(instructions: String, criteria: [String])
 
+    /// API のリクエストで質問 1 件が持つキー。
     enum CodingKeys: String, CodingKey {
         case type
         case instructions
@@ -212,15 +219,22 @@ enum JevQuestion: Encodable {
 
 /// POST /v1/systemone の応答のうち mailer が使う部分。
 struct JevResponse: Decodable {
+    /// 実際に判定したモデル ID。
     let model: String
+    /// 質問名 -> 回答。
     let answers: [String: JevAnswer]
 }
 
 /// 質問 1 件の回答。type によって入るフィールドが違う (choice: choice + confidence、noul: noul、score: score + confidence)。
 struct JevAnswer: Decodable {
+    /// 質問の種類 (choice / noul / score)。
     let type: String
+    /// choice の選ばれた選択肢名。
     let choice: String?
+    /// choice / score の確信度 (0〜1)。
     let confidence: Double?
+    /// noul の該当確率 (0〜1)。
     let noul: Double?
+    /// score の実数値 (段階の添字に対応)。
     let score: Double?
 }

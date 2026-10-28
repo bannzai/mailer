@@ -76,8 +76,9 @@ public struct InquiryClassificationPipeline: Sendable {
                 continue
             }
             do {
-                let fullMessage = try await gmail.getMessage(id: message.id, format: .full)
-                let classification = try await classifier.classify(text: try Self.inputText(message: fullMessage))
+                let classification = try await classifier.classify(
+                    text: try Self.inputText(message: try await gmail.getMessage(id: message.id, format: .full))
+                )
                 stored[message.id] = classification
                 try store.save(stored, account: gmail.email)
                 result[message.id] = classification
