@@ -48,9 +48,11 @@ public struct InquiryClassificationPipeline: Sendable {
     /// Jev に送るテキスト。件名を 1 行目に置き、本文を続けて maxInputCharacters に切り詰める。
     /// 本文を charset で復号できないメールは投げる (文字化けした本文の判定を保存しないため)。
     public static func inputText(message: GmailMessage) throws -> String {
-        let subject = message.subject.map { "件名: \($0)\n\n" } ?? ""
-        let body = try message.plainTextBody()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return String((subject + body).prefix(maxInputCharacters))
+        return String(
+            ((message.subject.map { "件名: \($0)\n\n" } ?? "")
+                + (try message.plainTextBody()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""))
+                .prefix(maxInputCharacters)
+        )
     }
 
     /// メール集合を分類する。保存済みのメールは API を呼ばず保存値を返す (冪等)。

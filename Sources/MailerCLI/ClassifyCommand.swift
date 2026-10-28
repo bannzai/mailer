@@ -4,6 +4,7 @@ import MailerCore
 
 /// 受信処理の分類ステップを CLI から実行する。未判定のメールだけ Jev に送り、結果を保存して通知枠との対応を表示する。
 struct ClassifyCommand: AsyncParsableCommand {
+    /// コマンド名と説明。
     static let configuration = CommandConfiguration(
         commandName: "classify",
         abstract: "受信トレイのメールを Jev で分類し、結果を保存して通知枠との対応を表示する"
@@ -22,12 +23,14 @@ struct ClassifyCommand: AsyncParsableCommand {
     )
     var query: String
 
+    /// --query が空白・改行だけでないことを検査する (空だと受信トレイ全体が外部 API に渡るため)。
     func validate() throws {
-        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else {
+        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw ValidationError("--query に問い合わせメールを絞る検索クエリを指定してください (例: to:support@example.com)。")
         }
     }
 
+    /// 受信トレイを --query で絞って取得し、未判定のメールを分類・保存して、各メールと属する枠を 1 行ずつ表示する。
     func run() async throws {
         let client = try CLIContext.gmailClient(explicitAccount: accountOptions.account)
         let refs = try await client.listMessages(query: query, labelIds: ["INBOX"], maxResults: max).messages ?? []

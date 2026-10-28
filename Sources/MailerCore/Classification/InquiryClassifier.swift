@@ -187,8 +187,11 @@ struct JevRequest: Encodable {
 
 /// 質問の種類ごとに criteria の形が違う (choice / noul は選択肢名 -> 基準、score は段階名の配列)。
 enum JevQuestion: Encodable {
+    /// 選択肢から 1 つ選ぶ質問 (選択肢名 -> 基準)。
     case choice(instructions: String, criteria: [String: String])
+    /// 該当するかの確率を返す質問 (true / false -> 基準)。
     case noul(instructions: String, criteria: [String: String])
+    /// 段階のスコアを返す質問 (段階名の配列)。
     case score(instructions: String, criteria: [String])
 
     /// API のリクエストで質問 1 件が持つキー。

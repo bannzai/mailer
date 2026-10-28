@@ -48,8 +48,11 @@ public struct InquiryClassification: Codable, Sendable, Equatable {
 
 /// 確率を「採用 / 不確実 / 却下」の 3 帯に分ける。不確実帯の判定は通知枠の条件に使わず、既存の通知経路に流す。
 public enum InquiryClassificationBand: Sendable, Equatable {
+    /// 確率が adoptedThreshold 以上。通知枠の条件に使う。
     case adopted
+    /// 採用でも却下でもない帯。通知枠の条件には使わず既存の通知経路に流す。
     case uncertain
+    /// 確率が rejectedThreshold 以下。
     case rejected
 
     /// 採用とみなす確率の下限。jev-decide の判定鎖と同じ 0.7 / 0.3 (TypeSafe 公式の confidence 3 段階に合わせた値。

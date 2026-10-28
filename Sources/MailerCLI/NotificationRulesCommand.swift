@@ -4,6 +4,7 @@ import MailerCore
 
 /// 通知枠 (フィルタルール) を CLI から管理する。枠定義は NotificationRuleStore の notification-rules.json に保存する。
 struct NotificationRulesCommand: ParsableCommand {
+    /// コマンド名・説明・サブコマンド (既定は list)。
     static let configuration = CommandConfiguration(
         commandName: "notification-rules",
         abstract: "通知枠 (フィルタルール) の一覧・追加・削除",
@@ -13,6 +14,7 @@ struct NotificationRulesCommand: ParsableCommand {
 
     /// 登録済みの通知枠を評価順 (保存した並び) に 1 行ずつ表示する。
     struct List: ParsableCommand {
+        /// サブコマンド名と説明。
         static let configuration = CommandConfiguration(commandName: "list", abstract: "登録済みの通知枠を一覧する")
 
         /// 枠を読み込んで 1 行ずつ表示する。無ければ追加方法を案内する。
@@ -32,6 +34,7 @@ struct NotificationRulesCommand: ParsableCommand {
 
     /// 通知枠を追加する。同名の枠が既にあれば置き換える (冪等)。
     struct Add: ParsableCommand {
+        /// サブコマンド名と説明。
         static let configuration = CommandConfiguration(commandName: "add", abstract: "通知枠を追加する (同名なら置き換え)")
 
         /// 枠の名前 (識別子)。
@@ -152,6 +155,7 @@ struct NotificationRulesCommand: ParsableCommand {
 
     /// 名前で指定した通知枠を削除する。無ければエラー。
     struct Remove: ParsableCommand {
+        /// サブコマンド名と説明。
         static let configuration = CommandConfiguration(commandName: "remove", abstract: "通知枠を削除する")
 
         /// 削除する枠の名前。
